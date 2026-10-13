@@ -19,7 +19,7 @@ from src.core.utils import _plain_url
 logger = get_logger(__name__)
 
 GENDER_TAG_RE = re.compile(
-    r"\s*[\(\[\{/\-]?\s*(?:m/w/d|m/f/d|w/m/d|d/m/w|mwd|mfd|wmd|gn|divers|all genders|m/w/div|geschlechtsneutral)\s*[\)\]\}]?",
+    r"\s*[\(\[\{/\-]?\s*(?:m/w/d|m/f/d|w/m/d|d/m/w|mwd|mfd|wmd|gn|divers|all genders|m/w/div|geschlechtsneutral|m/f/x|m/w/x|w/m/x|f/m/d|d/m/f|x/m/w)\s*[\)\]\}]?",
     re.IGNORECASE,
 )
 COMPANY_LEGAL_RE = re.compile(
@@ -41,6 +41,14 @@ def _clean_title(t: Any) -> str:
     return _norm_alphanumeric(cleaned)
 
 
+def _title_tokens(t: Any) -> set[str]:
+    """Extract substantive alphanumeric word tokens (length >= 3) for fuzzy title overlap."""
+    if t is None or (isinstance(t, float) and pd.isna(t)):
+        return set()
+    cleaned = GENDER_TAG_RE.sub("", str(t)).lower()
+    return set(re.findall(r"[a-z0-9]{3,}", cleaned))
+
+
 def _clean_company(c: Any) -> str:
     if c is None or (isinstance(c, float) and pd.isna(c)):
         return ""
@@ -56,9 +64,9 @@ def _norm_title(value: Any) -> str:
 class KnownJobsIndex:
     """In-memory index supporting exact URL matching and fuzzy company+title overlap."""
 
-    def __init__(self, urls: set[str], records: list[dict[str, str]]):
+    def __init__(self, urls: set[str], records: list[dict[str, Any]]):
         self.urls: set[str] = urls
-        self.records: list[dict[str, str]] = records
+        self.records: list[dict[str, Any]] = records
 
     def is_match(self, job_url: Any, company: Any, title: Any) -> bool:
         u_raw = "" if job_url is None or (isinstance(job_url, float) and pd.isna(job_url)) else str(job_url)
@@ -70,6 +78,8 @@ class KnownJobsIndex:
         t = _clean_title(title)
         if not c or not t:
             return False
+
+        t_toks = _title_tokens(title)
 
         for rec in self.records:
             rc = rec["comp"]
@@ -87,12 +97,27 @@ class KnownJobsIndex:
             if not c_match:
                 continue
 
-            # Title match: exact equality or substring if >= 6 chars
+            # Title match:
+            # 1. Exact or contiguous substring match
             t_match = False
             if t == rt:
                 t_match = True
             elif len(t) >= 6 and len(rt) >= 6 and (t in rt or rt in t):
                 t_match = True
+
+            # 2. Token overlap match (e.g. slight title rewording across portals)
+            if not t_match and t_toks:
+                rec_toks = rec.get("tokens")
+                if rec_toks:
+                    inter = t_toks & rec_toks
+                    union = t_toks | rec_toks
+                    smaller = min(len(t_toks), len(rec_toks))
+                    if union:
+                        jaccard = len(inter) / len(union)
+                        subset_ratio = len(inter) / smaller if smaller else 0
+                        # Match if high token Jaccard (>= 0.6) or high subset overlap with >= 3 substantive tokens
+                        if jaccard >= 0.6 or (smaller >= 3 and subset_ratio >= 0.75):
+                            t_match = True
 
             if c_match and t_match:
                 return True
@@ -135,7 +160,7 @@ def load_known_job_keys(db_path: str = "data/karriere.db") -> tuple[set[str], se
 def load_known_jobs_index(db_path: str = "data/karriere.db") -> KnownJobsIndex:
     """Load an in-memory KnownJobsIndex with exact URLs and normalized company+title pairs."""
     urls: set[str] = set()
-    records: list[dict[str, str]] = []
+    records: list[dict[str, Any]] = []
     if not db_path or not os.path.exists(db_path):
         return KnownJobsIndex(urls, records)
     conn = None
@@ -156,7 +181,11 @@ def load_known_jobs_index(db_path: str = "data/karriere.db") -> KnownJobsIndex:
             c = _clean_company(company)
             t = _clean_title(title)
             if c and t:
-                records.append({"comp": c, "title": t})
+                records.append({
+                    "comp": c,
+                    "title": t,
+                    "tokens": _title_tokens(title),
+                })
     except Exception as exc:
         logger.warning(f"Could not load applied/dismissed jobs for dedup: {exc}")
     finally:
