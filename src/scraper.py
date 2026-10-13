@@ -10,4 +10,5 @@ from src.scrapers.orchestrator import (
 from src.scrapers.bund import run_scrape_bund
 from src.scrapers.xing import run_scrape_xing
 from src.scrapers.personio import run_scrape_personio
+from src.scrapers.arbeitnow import run_scrape_arbeitnow
 
