@@ -457,6 +457,7 @@ def run_gemini_matcher_on_db(
     rate_limit_delay: float = 4.1,
     db_path: str = "data/karriere.db",
     min_job_id: int | None = None,
+    portal: str | None = None,
 ) -> list:
     """Evaluates pending/unevaluated jobs directly from SQLite data/karriere.db."""
     import sqlite3
@@ -472,6 +473,23 @@ def run_gemini_matcher_on_db(
     LEFT JOIN evaluations e ON j.id = e.job_id
     WHERE e.id IS NULL AND length(j.description) > 30
     '''
+    if portal:
+        p = portal.lower().strip()
+        if p == "arbeitnow":
+            q += " AND j.url LIKE '%arbeitnow%'"
+        elif p == "linkedin":
+            q += " AND (j.url LIKE '%linkedin%' OR j.url LIKE '%licdn%')"
+        elif p == "xing":
+            q += " AND j.url LIKE '%xing%'"
+        elif p == "personio":
+            q += " AND j.url LIKE '%personio%'"
+        elif p in ("bund", "interamt"):
+            q += " AND (j.url LIKE '%bund.de%' OR j.url LIKE '%interamt.de%')"
+        elif p in ("ba", "arbeitsagentur"):
+            q += " AND j.url LIKE '%arbeitsagentur.de%'"
+        elif p == "indeed":
+            q += " AND j.url LIKE '%indeed%'"
+
     if min_job_id is not None and min_job_id > 0:
         q += ' AND j.id >= ?'
         params.append(min_job_id)

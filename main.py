@@ -200,7 +200,8 @@ def handle_match(args):
             model_name=args.model,
             limit=args.limit,
             rate_limit_delay=args.delay,
-            db_path=db_path
+            db_path=db_path,
+            portal=getattr(args, "portal", None)
         )
 
 
@@ -323,6 +324,12 @@ def main():
         type=float,
         default=4.1,
         help="Delay between API calls in seconds (default: 4.1 for 15 RPM free tier)"
+    )
+    match_parser.add_argument(
+        "--portal",
+        type=str,
+        default=None,
+        help="Filter pending jobs to evaluate by portal (e.g. arbeitnow, linkedin, xing, personio)"
     )
 
 # Dashboard parser
