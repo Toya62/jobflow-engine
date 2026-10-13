@@ -69,11 +69,13 @@ export function normalizeCvPath(path: string | null | undefined): string {
 
 export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Promise<void> {
   const urlParams = new URLSearchParams(window.location.search);
+  const statusParam = urlParams.get("status")?.toLowerCase() || "all";
+  const isLifecycleStatus = ["interview", "interviewed", "rejected"].includes(statusParam);
   const state: CrmUrlState = {
     ...initial,
-    date: urlParams.get("date") || initial.date || "today",
+    date: urlParams.get("date") || (isLifecycleStatus ? "all" : initial.date || "today"),
   };
-  let statusFilter = urlParams.get("status")?.toLowerCase() || "all";
+  let statusFilter = statusParam;
   let allRecords: TrackerRecord[] = [];
   let currentRecords: TrackerRecord[] = [];
   const selected = new Set<string>();
@@ -542,6 +544,13 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
   });
   statusFilterSelect.addEventListener("change", () => {
     statusFilter = statusFilterSelect.value;
+    if (["interview", "interviewed", "rejected"].includes(statusFilter)) {
+      state.date = "all";
+      dateSelect.value = "all";
+      const url = new URL(window.location.href);
+      url.searchParams.set("date", "all");
+      window.history.replaceState(null, "", url);
+    }
     syncStatusToUrl();
     commit();
   });
