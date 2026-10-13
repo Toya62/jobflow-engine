@@ -542,6 +542,15 @@ def generate_application(
         result["success"] = True
         result["ats_keywords"] = ats_keywords
         result["summary"] = tailoring_summary
+
+        # Auto-sync into CRM tracker (karriere.db)
+        try:
+            from src.generators.compiler import _sync_crm_csv
+            _sync_crm_csv([meta_path])
+            logger.info(f"  ✓ Synced {company} to CRM database")
+        except Exception as crm_err:
+            logger.warning(f"  Could not auto-sync CRM for {company}: {crm_err}")
+
         logger.info(f"  ✓ Application generation complete for {company}")
 
     except Exception as e:

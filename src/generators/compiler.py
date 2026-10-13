@@ -278,6 +278,11 @@ def _sync_crm_csv(updated_meta_paths):
 
         conn.commit()
         conn.close()
+        try:
+            from src.dashboard.state import clear_data_caches
+            clear_data_caches()
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"Failed to update karriere.db: {e}")
 import argparse
