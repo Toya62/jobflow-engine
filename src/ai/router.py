@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import time
 import urllib.request
 import urllib.error
 import ssl
@@ -23,6 +24,8 @@ class AIRouter:
     def __init__(self):
         self.keys = self._load_keys()
         self.gemini_key_index = 0
+        self.gemini_consecutive_failures = 0
+        self.gemini_cooldown_until = 0.0
         self.preferred_gemini_models = [
             "gemini-3.1-flash-lite",
             "gemini-3.1-flash-lite-preview",
@@ -105,26 +108,35 @@ class AIRouter:
         elif preferred_model:
             models_to_try.insert(0, preferred_model)
 
-        # Step 1: Try Gemini (fast failover on outage)
-        gemini_keys = self.keys.get("gemini", [])
-        gemini_attempts = 0
-        for _ in range(min(2, len(gemini_keys) or 1)):
-            key = self._get_next_gemini_key()
-            if not key:
-                break
-            for model in models_to_try[:2]:
-                gemini_attempts += 1
-                try:
-                    result = self._call_gemini(prompt, model=model, key=key, schema=schema)
-                    if result:
-                        return result
-                except Exception as e:
-                    errors.append(f"Gemini({model}) error: {str(e)}")
-                    logger.warning(f"Gemini {model} failed: {e}. Trying fallback...")
-                if gemini_attempts >= 3:
+        # Step 1: Try Gemini (fast failover with circuit breaker)
+        now = time.time()
+        if now > self.gemini_cooldown_until:
+            gemini_keys = self.keys.get("gemini", [])
+            gemini_attempts = 0
+            for _ in range(min(2, len(gemini_keys) or 1)):
+                key = self._get_next_gemini_key()
+                if not key:
                     break
-            if gemini_attempts >= 3:
-                break
+                for model in models_to_try[:2]:
+                    gemini_attempts += 1
+                    try:
+                        result = self._call_gemini(prompt, model=model, key=key, schema=schema)
+                        if result:
+                            self.gemini_consecutive_failures = 0
+                            return result
+                    except Exception as e:
+                        errors.append(f"Gemini({model}) error: {str(e)}")
+                        logger.warning(f"Gemini {model} failed: {e}. Trying fallback...")
+                    if gemini_attempts >= 2:
+                        break
+                if gemini_attempts >= 2:
+                    break
+            self.gemini_consecutive_failures += 1
+            if self.gemini_consecutive_failures >= 2:
+                self.gemini_cooldown_until = now + 180
+                logger.warning("Gemini consecutive failure threshold reached (2). Pausing Gemini for 3m; routing directly to Groq/OpenRouter.")
+        else:
+            logger.info("Gemini currently in outage cooldown. Routing directly to Groq/OpenRouter.")
 
         # Step 2: Fallback to Groq
         if "groq" in self.keys:
