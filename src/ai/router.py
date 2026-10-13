@@ -105,13 +105,15 @@ class AIRouter:
         elif preferred_model:
             models_to_try.insert(0, preferred_model)
 
-        # Step 1: Try all Gemini keys & models
+        # Step 1: Try Gemini (fast failover on outage)
         gemini_keys = self.keys.get("gemini", [])
-        for _ in range(len(gemini_keys) or 1):
+        gemini_attempts = 0
+        for _ in range(min(2, len(gemini_keys) or 1)):
             key = self._get_next_gemini_key()
             if not key:
                 break
-            for model in models_to_try:
+            for model in models_to_try[:2]:
+                gemini_attempts += 1
                 try:
                     result = self._call_gemini(prompt, model=model, key=key, schema=schema)
                     if result:
@@ -119,6 +121,10 @@ class AIRouter:
                 except Exception as e:
                     errors.append(f"Gemini({model}) error: {str(e)}")
                     logger.warning(f"Gemini {model} failed: {e}. Trying fallback...")
+                if gemini_attempts >= 3:
+                    break
+            if gemini_attempts >= 3:
+                break
 
         # Step 2: Fallback to Groq
         if "groq" in self.keys:
@@ -139,6 +145,7 @@ class AIRouter:
             try:
                 result = self._call_openrouter(prompt, key=or_key)
                 if result:
+                    logger.info("Successfully generated response using OpenRouter fallback")
                     return result
             except Exception as e:
                 errors.append(f"OpenRouter error: {str(e)}")
@@ -160,7 +167,7 @@ class AIRouter:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         
-        with urllib.request.urlopen(req, timeout=30, context=_get_ssl_context()) as resp:
+        with urllib.request.urlopen(req, timeout=10, context=_get_ssl_context()) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
             candidates = resp_data.get("candidates", [])
             if candidates:
@@ -206,7 +213,7 @@ class AIRouter:
             "X-Title": "Karriere Pipeline AI Router"
         }
         payload = {
-            "model": "meta-llama/llama-3.3-70b-instruct:free",
+            "model": "meta-llama/llama-3.3-70b-instruct",
             "messages": [
                 {"role": "system", "content": "You are an expert ATS recruiter. Return valid JSON only."},
                 {"role": "user", "content": prompt}
