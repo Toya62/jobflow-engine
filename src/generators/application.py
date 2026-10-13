@@ -200,11 +200,15 @@ the Top 5 soft skill phrases from the job description above. These MUST appear n
     using only verified facts from the profile. Mirror relevant JD terminology without claiming unverified experience.
   - **Skills Matrix (REORDER)**: Place the employer's requested tools FIRST in each skill category line.
     Example: If JD says "Kubernetes, Docker, Terraform" → list them first under DevOps & Cloud.
-  - **Work Experience Bullet Headers (ALIGN)**: Use bold header prefixes that echo JD keywords.
-    Example: If JD emphasizes "Cloud Infrastructure" → use `\\textbf{{Cloud Infrastructure \\& Container-Orchestrierung}}:`
-    instead of a generic label.
-  - **Project Selection**: Highlight only projects explicitly present in the verified profile or supplied CV template.
-  - Include only work experience and education facts present in the verified profile. Do not copy sample candidate facts from templates.
+  - **Work Experience Depth & Bullets (EXPAND)**:
+    * Include ALL 5 verified roles. NEVER compress or omit roles.
+    * Do NOT truncate roles into 1-line summaries.
+    * For each role, provide 2 to 4 detailed, high-impact bullet points drawn directly from the verified profile's responsibilities list.
+    * Format each bullet with a bold keyword prefix (e.g. `\\item \\textbf{{Backend- \\& API-Entwicklung}}: ...`).
+    * Tailor the emphasis and phrasing of each bullet to match the target job's keywords without fabricating anything.
+  - **Education & Coursework**: Include full degree details and explicit Coursework Highlights (e.g. Software Architectures Note 1,0, CMake Internals Note 1,0, Database Systems Note 2,0).
+  - **Project Selection**: Highlight 3-4 key projects matching the job's domain from the verified profile (with clickable GitHub links).
+  - **Page Budget**: Ensure the CV fills exactly 2 pages with professional spacing without overflowing into a 3rd page.
 
 **Step 3 — Cover Letter Tailoring ("Bridge & Convince" Architecture)**:
   - **Paragraph 1 (Concrete Mission Hook)**: Name the company's specific product, platform, team, or project

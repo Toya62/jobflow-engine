@@ -143,6 +143,24 @@ def candidate_profile_context(profile: dict | None = None) -> str:
     profile = profile if profile is not None else _profile_data
     fields = ("personal_info", "education", "experience", "languages", "skills", "projects", "experience_summary", "ai_rules")
     candidate_data = {field: profile[field] for field in fields if profile.get(field)}
+
+    # Always enrich experience and coursework from data/candidate_master.yaml if available
+    master_path = os.path.join(_base_dir, "data", "candidate_master.yaml")
+    if os.path.exists(master_path):
+        try:
+            with open(master_path, "r", encoding="utf-8") as f:
+                master = yaml.safe_load(f) or {}
+                if not candidate_data.get("experience") and master.get("experience"):
+                    candidate_data["experience"] = master.get("experience")
+                if master.get("education"):
+                    # Check if coursework highlights are missing
+                    edu_master = master.get("education")
+                    edu_current = candidate_data.get("education")
+                    if not edu_current or not any(e.get("coursework_highlights") for e in edu_current if isinstance(e, dict)):
+                        candidate_data["education"] = edu_master
+        except Exception:
+            pass
+
     return yaml.safe_dump(candidate_data, allow_unicode=True, sort_keys=False).strip()
 
 

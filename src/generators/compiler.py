@@ -88,12 +88,13 @@ def _sanitize_tex_file(tex_path: str) -> None:
         content = content.replace(r'\„', '"').replace(r'\“', '"').replace(r'\”', '"')
         # 8. Escape unescaped underscores (not \_) to prevent math mode errors
         content = re.sub(r'(?<!\\)_', r'\_', content)
-        # 8b. Strip invalid hallucinated commands
         content = content.replace(r'\ltolayout', '')
         content = content.replace(r'}\CI/CD', r', CI/CD}')
         content = content.replace(r'\CI/CD', r'CI/CD')
         content = content.replace(r'\CI', r'CI')
         content = content.replace(r'\item \\textbf', r'\item \textbf')
+        content = re.sub(r'\\+\s*\\\\', r'\\\\', content)
+        content = re.sub(r'(\\href\{[^}]+\}\{[^}]+)\}\}', r'\1}', content)
         # 9. Fix lines ending with a single backslash (should be \\ in LaTeX)
         sanitized_lines = []
         for line in content.splitlines():
