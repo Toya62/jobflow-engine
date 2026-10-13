@@ -24,10 +24,10 @@ class AIRouter:
         self.keys = self._load_keys()
         self.gemini_key_index = 0
         self.preferred_gemini_models = [
-            "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
+            "gemini-3.1-flash-lite-preview",
             "gemini-3.6-flash",
-            "gemini-2.5-flash"
+            "gemini-3.5-flash-lite"
         ]
         self.groq_models = [
             "openai/gpt-oss-120b",
@@ -263,7 +263,15 @@ def route_ai_evaluation(system_prompt: str, user_prompt: str, preferred_model: O
             cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
         elif "```" in cleaned:
             cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
+        else:
+            # Fallback regex to isolate JSON object
+            m = re.search(r'(\{[\s\S]*\})', cleaned)
+            if m:
+                cleaned = m.group(1).strip()
             
+        # Strip trailing commas before closing braces/brackets
+        cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
+
         return json.loads(cleaned)
     except Exception as e:
         logger.error(f"Error in route_ai_evaluation: {e}")
