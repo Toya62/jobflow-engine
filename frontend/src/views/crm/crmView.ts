@@ -16,8 +16,8 @@ const DEFAULT_VIEWPORT_HEIGHT = 480;
 const STATUS_OPTIONS = ["Prepared", "Applied", "Interview", "Interviewed", "Rejected"] as const;
 
 const DATE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
-  ["all", "All Time"],
   ["today", "Today Only"],
+  ["all", "All Time"],
   ["2d", "Last 2 Days"],
   ["3d", "Last 3 Days"],
   ["7d", "Last 7 Days"],
@@ -68,8 +68,12 @@ export function normalizeCvPath(path: string | null | undefined): string {
 }
 
 export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Promise<void> {
-  const state: CrmUrlState = { ...initial };
-  let statusFilter = new URLSearchParams(window.location.search).get("status")?.toLowerCase() || "all";
+  const urlParams = new URLSearchParams(window.location.search);
+  const state: CrmUrlState = {
+    ...initial,
+    date: urlParams.get("date") || initial.date || "today",
+  };
+  let statusFilter = urlParams.get("status")?.toLowerCase() || "all";
   let allRecords: TrackerRecord[] = [];
   let currentRecords: TrackerRecord[] = [];
   const selected = new Set<string>();
@@ -543,6 +547,10 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
   });
   dateSelect.addEventListener("change", () => {
     state.date = dateSelect.value;
+    const url = new URL(window.location.href);
+    if (state.date === "today") url.searchParams.delete("date");
+    else url.searchParams.set("date", state.date);
+    window.history.replaceState(null, "", url);
     commit();
   });
   exactInput.addEventListener("change", () => {
@@ -552,15 +560,18 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
   clearButton.addEventListener("click", () => {
     state.q = "";
     state.loc = "";
-    state.date = "all";
+    state.date = "today";
     state.exact = "";
     statusFilter = "all";
     qInput.value = "";
     locInput.value = "";
-    dateSelect.value = "all";
+    dateSelect.value = "today";
     exactInput.value = "";
     statusFilterSelect.value = "all";
     syncStatusToUrl();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("date");
+    window.history.replaceState(null, "", url);
     commit();
   });
 

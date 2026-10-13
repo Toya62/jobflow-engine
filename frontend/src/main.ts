@@ -94,8 +94,17 @@ if (!root) throw new Error("Root element #app not found");
     setActiveTab(view);
 
     if (view === "crm") {
+      const urlParams = new URLSearchParams(window.location.search);
       await import("./views/crm/crmView").then(({ mountCrmView }) =>
-        mountCrmView(viewContainer, { q: "", loc: "", date: "all", exact: "", sort: "date_applied", dir: "desc", dataset: "" })
+        mountCrmView(viewContainer, {
+          q: urlParams.get("q") || "",
+          loc: urlParams.get("loc") || "",
+          date: urlParams.get("date") || "today",
+          exact: urlParams.get("exact") || "",
+          sort: urlParams.get("sort") || "date_applied",
+          dir: (urlParams.get("dir") as "asc" | "desc") || "desc",
+          dataset: ""
+        })
       );
     } else if (view === "scraper") {
       await import("./views/scraper/scraperView").then(({ mountScraperView }) =>
