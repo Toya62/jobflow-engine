@@ -4,9 +4,10 @@ from src.scrapers.orchestrator import (
     run_scrape_linkedin,
     run_scrape_indeed,
     run_scrape_ba,
-    run_scrape_bund,
-    run_scrape_xing,
-    run_scrape_personio,
     save_jobs_to_db,
     _ALL_TIME_FILES,
 )
+from src.scrapers.bund import run_scrape_bund
+from src.scrapers.xing import run_scrape_xing
+from src.scrapers.personio import run_scrape_personio
+

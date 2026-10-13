@@ -353,7 +353,7 @@ def run_scrape_personio() -> None:
     logger.info("\n" + "=" * 46)
     logger.info("  Personio ATS Direct XML Scraper")
     logger.info(f"  Window : last {max_days} day(s) ({window_tag})")
-    logger.info(f"  Output : {LATEST_PERSONIO} | {ALL_TIME_PERSONIO}")
+    logger.info("  Output : data/karriere.db (direct SQLite)")
     logger.info("=" * 46 + "\n")
 
     df = scrape_personio_network()
