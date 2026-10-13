@@ -21,7 +21,7 @@ import { buildAiPrompt } from "./prompt";
 import { computeWindow } from "./virtualTable";
 import { ensureDescription } from "./description";
 import { flattenResult, isSuccessStatus } from "./jobGenDrawer";
-import { notifyApplicationGenerated } from "../../events";
+import { notifyApplicationGenerated, onApplicationGenerated } from "../../events";
 
 const DEBOUNCE_MS = 200;
 const DEFAULT_VIEWPORT_HEIGHT = 480;
@@ -890,6 +890,34 @@ function paintModeButtons(): void {
   } catch (error) {
     statusEl.textContent = `Failed to load datasets: ${error instanceof Error ? error.message : String(error)}`;
   }
+  // Auto-update Generate CV button states across table when generation completes anywhere
+  const unsubscribeGen = onApplicationGenerated((detail) => {
+    if (!root.isConnected) {
+      unsubscribeGen();
+      return;
+    }
+    if (detail?.company && detail?.position) {
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const dComp = norm(detail.company);
+      const dTitle = norm(detail.position);
+      for (const job of allJobs) {
+        const jComp = norm(String(job.company || ""));
+        const jTitle = norm(String(job.title || ""));
+        if (
+          jComp && dComp && (jComp === dComp || jComp.includes(dComp) || dComp.includes(jComp)) &&
+          jTitle && dTitle && (jTitle === dTitle || jTitle.includes(dTitle) || dTitle.includes(jTitle))
+        ) {
+          const key = jobKey(job);
+          setJobGenState(key, {
+            status: "ready",
+            label: "✓ Generated",
+            message: "Application generated.",
+          });
+        }
+      }
+    }
+  });
+
   syncUrl(state);
   await loadJobs();
 }
