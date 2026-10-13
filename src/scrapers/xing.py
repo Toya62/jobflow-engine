@@ -121,7 +121,7 @@ def fetch_xing_job_detail(relative_or_full_url: str, max_days: int = 1) -> dict:
         return {}
 
 
-def scrape_xing(queries: list[str] = None, max_pages: int = 2) -> pd.DataFrame:
+def scrape_xing(queries: list[str] = None, max_pages: int = 4) -> pd.DataFrame:
     """Scrapes XING job search result pages and concurrently extracts full job data."""
     search_queries = queries or XING_QUERIES
     logger.info(f"🟢 Starting XING scrape across {len(search_queries)} queries...")
