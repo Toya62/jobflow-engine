@@ -9,9 +9,10 @@ services:
       - ./data:/app/data
       - ./applications:/app/applications
       - ./user_profile.yml:/app/user_profile.yml
+      - ./filter_config.yml:/app/filter_config.yml
       - ./templates:/app/templates
+      - /app/dashboard/app
       - ./src:/app/src
-      - ./dashboard:/app/dashboard
       - ./main.py:/app/main.py
     env_file:
       - .env
