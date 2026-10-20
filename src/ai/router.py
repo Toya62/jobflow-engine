@@ -27,10 +27,9 @@ class AIRouter:
         self.gemini_consecutive_failures = 0
         self.gemini_cooldown_until = 0.0
         self.preferred_gemini_models = [
-            "gemini-3.1-flash-lite",
             "gemini-3.1-flash-lite-preview",
-            "gemini-3.6-flash",
-            "gemini-3.5-flash-lite"
+            "gemini-3-flash-preview",
+            "gemini-flash-latest"
         ]
         self.groq_models = [
             "llama-3.3-70b-versatile",
@@ -178,7 +177,7 @@ class AIRouter:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         
-        with urllib.request.urlopen(req, timeout=10, context=_get_ssl_context()) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=_get_ssl_context()) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
             candidates = resp_data.get("candidates", [])
             if candidates:
