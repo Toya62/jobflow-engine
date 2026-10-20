@@ -84,6 +84,20 @@ def test_pg_cursor_translates_datetime_now():
     )
 
 
+def test_pg_cursor_escapes_literal_percent_with_params():
+    mock_cur = mock.MagicMock()
+    wrapper = PgCursorWrapper(mock_cur)
+
+    wrapper.execute(
+        "UPDATE jobs SET url = ? WHERE company = ? AND title = ? AND (url LIKE 'mailto:%')",
+        ("https://example.com", "ACME", "Dev")
+    )
+    mock_cur.execute.assert_called_once_with(
+        "UPDATE jobs SET url = %s WHERE company = %s AND title = %s AND (url LIKE 'mailto:%%')",
+        ("https://example.com", "ACME", "Dev")
+    )
+
+
 def test_pg_connection_context_manager():
     mock_conn = mock.MagicMock()
     wrapper = PgConnectionWrapper(mock_conn)

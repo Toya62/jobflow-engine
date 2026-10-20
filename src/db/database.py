@@ -72,8 +72,14 @@ class PgCursorWrapper:
         if "datetime('now')" in pg_sql:
             pg_sql = pg_sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
 
-        # 5. Translate ? parameter placeholders to %s for PostgreSQL
-        if params is not None and "?" in pg_sql:
+        # 5. Translate ? parameter placeholders to %s for PostgreSQL.
+        # Escape any literal '%' to '%%' first so psycopg2 does not treat them as unsupplied format specifiers.
+        if params is not None:
+            if "%" in pg_sql:
+                pg_sql = pg_sql.replace("%", "%%")
+            if "?" in pg_sql:
+                pg_sql = pg_sql.replace("?", "%s")
+        elif "?" in pg_sql:
             pg_sql = pg_sql.replace("?", "%s")
 
         return self._cur.execute(pg_sql, params)
