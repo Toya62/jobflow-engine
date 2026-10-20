@@ -77,15 +77,49 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             pass
 
     if auto_ai:
-        if scraped_count > 0:
+        # Check for ANY pending unevaluated jobs for this portal in SQLite
+        pending_count = 0
+        p_filter = ""
+        p = portal_name.lower().strip()
+        if "arbeitnow" in p:
+            p_filter = "AND j.url LIKE '%arbeitnow%'"
+        elif "linkedin" in p:
+            p_filter = "AND (j.url LIKE '%linkedin%' OR j.url LIKE '%licdn%')"
+        elif "xing" in p:
+            p_filter = "AND j.url LIKE '%xing%'"
+        elif "personio" in p:
+            p_filter = "AND j.url LIKE '%personio%'"
+        elif "bund" in p:
+            p_filter = "AND (j.url LIKE '%bund.de%' OR j.url LIKE '%interamt.de%')"
+        elif "ba" in p or "agentur" in p:
+            p_filter = "AND j.url LIKE '%arbeitsagentur.de%'"
+        elif "indeed" in p:
+            p_filter = "AND j.url LIKE '%indeed%'"
+
+        if os.path.exists(db_path):
+            try:
+                import sqlite3
+                conn = sqlite3.connect(db_path)
+                q_pending = f"""
+                    SELECT COUNT(*) FROM jobs j
+                    LEFT JOIN evaluations e ON j.id = e.job_id
+                    WHERE e.id IS NULL AND length(j.description) > 30 {p_filter}
+                """
+                row = conn.cursor().execute(q_pending).fetchone()
+                pending_count = row[0] if row else 0
+                conn.close()
+            except Exception:
+                pending_count = scraped_count
+
+        if pending_count > 0:
             print(f"\n{'='*60}")
-            print(f"  [2/2] 🤖 Instantly Evaluating {scraped_count} Fresh Jobs via SQLite")
+            print(f"  [2/2] 🤖 Evaluating {pending_count} Pending Jobs for {portal_name} via SQLite")
             print(f"{'='*60}\n")
             try:
                 from src.ai.matcher import run_gemini_matcher_on_db
                 approved_jobs = run_gemini_matcher_on_db(
                     db_path=db_path,
-                    min_job_id=prev_max_id + 1 if prev_max_id > 0 else None
+                    portal=portal_name
                 )
                 approved_count = len(approved_jobs) if approved_jobs else 0
             except Exception as e:
@@ -96,7 +130,7 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
                 except Exception:
                     pass
         else:
-            print(f"\n[Info] No new jobs scraped for {portal_name}; skipping instant evaluation.")
+            print(f"\n[Info] All jobs for {portal_name} already evaluated; nothing pending.")
 
     return {"scraped": scraped_count, "approved": approved_count}
 

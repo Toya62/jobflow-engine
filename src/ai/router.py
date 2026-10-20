@@ -33,9 +33,8 @@ class AIRouter:
             "gemini-3.5-flash-lite"
         ]
         self.groq_models = [
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b"
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant"
         ]
 
     def _load_keys(self) -> Dict[str, List[str]]:
@@ -132,9 +131,9 @@ class AIRouter:
                 if gemini_attempts >= 2:
                     break
             self.gemini_consecutive_failures += 1
-            if self.gemini_consecutive_failures >= 2:
-                self.gemini_cooldown_until = now + 180
-                logger.warning("Gemini consecutive failure threshold reached (2). Pausing Gemini for 3m; routing directly to Groq/OpenRouter.")
+            if self.gemini_consecutive_failures >= 3:
+                self.gemini_cooldown_until = now + 30
+                logger.warning("Gemini consecutive failure threshold reached (3). Pausing Gemini for 30s; routing directly to Groq/OpenRouter.")
         else:
             logger.info("Gemini currently in outage cooldown. Routing directly to Groq/OpenRouter.")
 
