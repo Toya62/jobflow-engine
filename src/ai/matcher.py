@@ -61,17 +61,31 @@ Use the supplied profile as the only source of candidate facts. Do not assume qu
     - REJECT as "REJECTED_TECH_MISMATCH" ONLY IF the primary day-to-day work is centered entirely on an unverified platform with no adjacent foundation (e.g. pure SAP ABAP, pure Salesforce CRM, pure .NET/C# with no C++/Python systems work, pure Java Spring Boot with no Python/data engineering component, pure PHP, pure Rust, pure Go, pure frontend-only, pure PLC/SPS, pure mainframe/COBOL, pure wet-lab/bioinformatics, pure hardware/EE, pure mechanical engineering).
     - SELF-CORRECTION: If your summary cites a language requirement (German C1/native, "sehr gute Deutschkenntnisse", "fließend Deutsch") as the reason for rejection, you MUST set status to "REJECTED_LANGUAGE" or "REJECTED_NATIVE_EXCLUSIVE" — never "REJECTED_TECH_MISMATCH". Similarly, if the summary cites seniority/years of experience as the reason, use "REJECTED_SENIORITY_EXP".
 
-4. LEGAL & CLEARANCE GATE:
+4. EMPLOYMENT TYPE GATE:
+   - Candidate has COMPLETED Master of Science (M.Sc.) and is seeking FULL-TIME engineering employment.
+   - REJECT as "REJECTED_EMPLOYMENT_TYPE" if the position is exclusively:
+     * "Werkstudent" / "Working Student"
+     * "Praktikum" / "Internship"
+     * "Teilzeit" / "Part-time" or "Minijob" / "geringfügige Beschäftigung" (unless explicitly offering full-time conversion or full-time as an option).
+
+5. ROLE SCOPE & ENGINEERING FOCUS GATE:
+   - Candidate is a Software / Systems / Data / Platform Engineer.
+   - REJECT as "REJECTED_ROLE_MISMATCH" if the role is primarily:
+     * Non-development Customer Support, 1st/2nd level IT-Support, Technical Support Desk.
+     * Technical Onboarding Specialist / Customer Success / Training with minimal coding (Excel/phone assistance).
+     * Sales Engineering, Account Management, Marketing/Design Operations without core software development ownership.
+
+6. LEGAL & CLEARANCE GATE:
    - REJECT as "REJECTED_TECH_MISMATCH" if the posting explicitly requires EU/NATO citizenship or German Security Clearance (Ü2 / SÜ2).
    - Candidate is 100% ready to relocate anywhere in Germany. Never reject due to job location within Germany.
 
-5. DOCUMENT LANGUAGE:
+7. DOCUMENT LANGUAGE:
    - Recommend "ENGLISH" if the job description is in English or English is the primary working language.
    - Recommend "GERMAN" if the job description is in German and fits B2 German.
 
 Analyze the entire job description and return only a JSON object with this schema:
 {
-  "status": "APPROVED" | "REJECTED_LANGUAGE" | "REJECTED_SENIORITY_EXP" | "REJECTED_TECH_MISMATCH" | "REJECTED_NATIVE_EXCLUSIVE",
+  "status": "APPROVED" | "REJECTED_LANGUAGE" | "REJECTED_SENIORITY_EXP" | "REJECTED_TECH_MISMATCH" | "REJECTED_NATIVE_EXCLUSIVE" | "REJECTED_EMPLOYMENT_TYPE" | "REJECTED_ROLE_MISMATCH",
   "is_approved": true | false,
   "interview_chance": "HIGH" | "MEDIUM" | "LOW",
   "match_score": 0-100,
