@@ -82,7 +82,15 @@ class PgCursorWrapper:
         elif "?" in pg_sql:
             pg_sql = pg_sql.replace("?", "%s")
 
-        return self._cur.execute(pg_sql, params)
+        self._cur.execute(pg_sql, params)
+        return self
+
+    def executemany(self, sql: str, seq_of_params):
+        pg_sql = sql
+        if "?" in pg_sql:
+            pg_sql = pg_sql.replace("?", "%s")
+        self._cur.executemany(pg_sql, seq_of_params)
+        return self
 
     def fetchone(self):
         return self._cur.fetchone()

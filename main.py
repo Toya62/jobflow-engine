@@ -51,8 +51,8 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             row = conn.cursor().execute("SELECT COALESCE(MAX(id), 0) FROM jobs").fetchone()
             prev_max_id = row[0] if row else 0
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Warning] Failed to fetch prev_max_id: {e}", file=sys.stderr)
 
     try:
         scrape_func()
@@ -72,8 +72,8 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             row = conn.cursor().execute("SELECT COUNT(*) FROM jobs WHERE id > ?", (prev_max_id,)).fetchone()
             scraped_count = row[0] if row else 0
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Warning] Failed to count new jobs: {e}", file=sys.stderr)
 
     if auto_ai:
         # Check for ANY pending unevaluated jobs for this portal in Database
@@ -106,12 +106,14 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
                 row = conn.cursor().execute(q_pending).fetchone()
                 pending_count = row[0] if row else 0
                 conn.close()
-            except Exception:
+            except Exception as e:
+                print(f"[Warning] Failed to count pending jobs: {e}", file=sys.stderr)
                 pending_count = scraped_count
 
+        db_label = "PostgreSQL" if is_postgres() else "SQLite"
         if pending_count > 0:
             print(f"\n{'='*60}")
-            print(f"  [2/2] 🤖 Evaluating {pending_count} Pending Jobs for {portal_name} via SQLite")
+            print(f"  [2/2] 🤖 Evaluating {pending_count} Pending Jobs for {portal_name} via {db_label}")
             print(f"{'='*60}\n")
             try:
                 from src.ai.matcher import run_gemini_matcher_on_db

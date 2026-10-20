@@ -98,6 +98,16 @@ def test_pg_cursor_escapes_literal_percent_with_params():
     )
 
 
+def test_pg_cursor_execute_returns_self():
+    mock_cur = mock.MagicMock()
+    mock_cur.fetchone.return_value = (42,)
+    wrapper = PgCursorWrapper(mock_cur)
+
+    res = wrapper.execute("SELECT 1")
+    assert res is wrapper
+    assert res.fetchone() == (42,)
+
+
 def test_pg_connection_context_manager():
     mock_conn = mock.MagicMock()
     wrapper = PgConnectionWrapper(mock_conn)
