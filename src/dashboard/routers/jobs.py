@@ -81,6 +81,24 @@ def clean_jobs_df(df):
             df[col] = df[col].fillna(default_val)
 
     df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0).astype(int)
+
+    # Deduplicate cross-portal reposts (e.g., same job on LinkedIn and Arbeitnow)
+    # Normalize company (strip GmbH, AG, SE) and title (strip gender suffixes)
+    import re
+    def _norm_co(c):
+        s = re.sub(r'\b(gmbh|ag|se|co\.?\s*kg|inc|corp|ltd)\b', '', str(c).lower())
+        return re.sub(r'[^a-z0-9]', '', s).strip()
+
+    def _norm_ti(t):
+        s = re.sub(r'\(m/w/d\)|\(w/m/d\)|\(f/m/d\)|\(f/m/x\)|\(all genders\)|\(x/f/m\)', '', str(t).lower())
+        return re.sub(r'[^a-z0-9]', '', s).strip()
+
+    df["_norm_c"] = df["company"].apply(_norm_co)
+    df["_norm_t"] = df["title"].apply(_norm_ti)
+    # Prefer URLs with direct application or rich portal info (e.g. LinkedIn, Arbeitsagentur)
+    df = df.drop_duplicates(subset=["_norm_c", "_norm_t"], keep="first")
+    df = df.drop(columns=["_norm_c", "_norm_t"])
+
     return df.astype(object).where(pd.notnull(df), None)
 
 

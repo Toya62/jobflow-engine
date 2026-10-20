@@ -119,6 +119,16 @@ def save_jobs_to_db(df, db_path: str | os.PathLike[str] = DB_PATH) -> int:
                 desc = ""
             scraped = normalize_scraped_at(r.get("scraped_at", r.get("date_posted", "")))
 
+            # Check if this company and title already exists to avoid cross-portal duplicates
+            cursor.execute(
+                "SELECT id FROM jobs WHERE LOWER(company) = LOWER(?) AND LOWER(title) = LOWER(?)",
+                (c, t)
+            )
+            existing_row = cursor.fetchone()
+            if existing_row:
+                # Job already known under another URL; skip inserting duplicate row
+                continue
+
             cursor.execute(
                 """
                 INSERT OR IGNORE INTO jobs (company, title, url, location, description, scraped_at)
