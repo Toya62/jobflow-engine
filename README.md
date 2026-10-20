@@ -104,14 +104,14 @@ karriere-pipeline/
 ├── src/
 │   ├── ai/
 │   │   ├── matcher.py         # Multi-model LLM matching engine & scoring logic
-│   │   └── prompts.py         # Structured evaluation and application prompts
+│   │   └── router.py          # Multi-provider routing (Gemini, Groq, OpenRouter)
 │   ├── core/
 │   │   ├── config.py          # Configuration loader & profile validator
 │   │   ├── filters.py         # Rule-based candidate & tech stack filtering
-│   │   └── models.py          # Data models (Job, CandidateProfile, MatchResult)
+│   │   └── notifier.py        # WhatsApp alert dispatch & scrape summaries
 │   ├── db/
-│   │   ├── database.py        # SQLite connection manager & query helpers
-│   │   └── schema.py          # Tables: jobs, matches, applications, crm_tracking
+│   │   ├── database.py        # Dual PostgreSQL/SQLite schema & query layer
+│   │   └── file_io.py         # Database ingestion & deduplication helpers
 │   ├── generators/
 │   │   ├── application.py     # LaTeX CV and Anschreiben template populator
 │   │   ├── compiler.py        # Tectonic PDF compiler & typography linter

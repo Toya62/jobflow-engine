@@ -63,7 +63,7 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             send_whatsapp_alert(f"⚠️ *Scraper Error on {portal_name}*\n\nError: {e}\nCheck GitHub Actions run logs for details.")
         except Exception:
             pass
-        return {"scraped": 0, "approved": 0}
+        return {"scraped": 0, "approved": 0, "error": str(e)}
 
     # Measure newly added jobs in Database
     if is_postgres() or os.path.exists(db_path):

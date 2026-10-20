@@ -55,7 +55,7 @@ Local scrapers (main.py scrape)
 | `src/ai/matcher.py` and `src/ai/router.py` | AI-assisted job evaluation stored directly in relational `evaluations` |
 | `src/dashboard/server.py` | FastAPI dashboard app (uvicorn entrypoint, routers, and CRM API) |
 | `src/generators/application.py` | Tailored CV/cover-letter source and PDF generation |
-| `src/core/compiler.py` | Local TeX compilation, metadata updates, CRM synchronization, and optional Git push |
+| `src/generators/compiler.py` | Local TeX compilation, metadata updates, CRM synchronization, and optional Git push |
 | `src/db/database.py` | Unified relational database layer (PostgreSQL primary via `DATABASE_URL`, SQLite fallback) |
 | `scripts/migrate_sqlite_to_pg.py` | Bulk sync utility between SQLite (`karriere.db`) and PostgreSQL instance |
 

@@ -94,9 +94,12 @@ def notify_scrape_summary(
     breakdown_lines = []
     if portal_breakdown:
         for p_name, p_stats in portal_breakdown.items():
-            p_app = p_stats.get("approved", 0)
-            p_scr = p_stats.get("scraped", 0)
-            breakdown_lines.append(f"   • {p_name}: +{p_app} approved ({p_scr} scraped)")
+            if p_stats.get("error"):
+                breakdown_lines.append(f"   • {p_name}: ⚠️ Error (failed)")
+            else:
+                p_app = p_stats.get("approved", 0)
+                p_scr = p_stats.get("scraped", 0)
+                breakdown_lines.append(f"   • {p_name}: +{p_app} approved ({p_scr} fresh)")
 
     breakdown_text = ("\n" + "\n".join(breakdown_lines) + "\n") if breakdown_lines else "\n"
 
