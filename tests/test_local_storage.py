@@ -35,13 +35,15 @@ def test_pull_command_uses_git_only(monkeypatch, capsys):
 def test_runtime_has_no_aws_storage_dependency_or_jenkins_credentials():
     project_root = Path(__file__).parents[1]
     requirements = (project_root / "requirements.txt").read_text(encoding="utf-8").lower()
-    jenkinsfile = (project_root / "Jenkinsfile").read_text(encoding="utf-8").lower()
-
     assert "boto3" not in requirements
-    assert "aws_access_key_id" not in jenkinsfile
-    assert "aws_secret_access_key" not in jenkinsfile
-    assert "s3_bucket_name" not in jenkinsfile
     assert not (project_root / "src" / "s3_helper.py").exists()
+
+    jenkinsfile_path = project_root / "Jenkinsfile"
+    if jenkinsfile_path.exists():
+        jenkinsfile = jenkinsfile_path.read_text(encoding="utf-8").lower()
+        assert "aws_access_key_id" not in jenkinsfile
+        assert "aws_secret_access_key" not in jenkinsfile
+        assert "s3_bucket_name" not in jenkinsfile
 
 
 def test_atomic_csv_write(tmp_path):
