@@ -55,9 +55,17 @@ Local scrapers (main.py scrape)
 | `src/dashboard/server.py` | FastAPI dashboard app (uvicorn entrypoint, routers, and SQLite CRM API) |
 | `src/generators/application.py` | Tailored CV/cover-letter source and PDF generation |
 | `src/core/compiler.py` | Local TeX compilation, metadata updates, SQLite CRM synchronization, and optional Git push |
-| `src/db.py` | SQLite schema initialization, table migrations, and remote Git database merge |
+| `src/db/database.py` | SQLite schema initialization, table migrations, and relational schema management |
+| `scripts/migrate_sqlite_to_pg.py` | Sync utility between primary SQLite (`karriere.db`) and PostgreSQL instance |
 
-## Application Lifecycle
+## Deployment & Hosting
+
+The system runs in dual mode:
+- **Local Development**: CLI workflows and local Vite/FastAPI development server via `main.py`.
+- **Cloud Production (Oracle Cloud ARM Ampere)**:
+  - Containerized deployment (`karriere-dashboard`) via Docker Compose.
+  - Reverse-proxied through Caddy with automatic SSL (`https://karriere-pipeline.duckdns.org/`).
+  - Optional PostgreSQL instance (`karriere-postgres`) on port 5432 for relational storage synchronization.
 
 1. Select a job in the dashboard or provide job details to the application generator.
 2. Generate the tailored TeX sources and `.meta.json` under `applications/YYYY-MM-DD/`.

@@ -56,6 +56,7 @@ dependencies = [
     "urllib3>=2.2.0",
     "uvicorn>=0.30,<1.0",
     "pyyaml>=6.0.0",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.optional-dependencies]
