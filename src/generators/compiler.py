@@ -223,18 +223,18 @@ def compile_all_applications(clean_tex: bool = True, push_git: bool = True, targ
 
 
 def _sync_crm_csv(updated_meta_paths):
-    """Automatically update data/karriere.db with newly compiled application details."""
-    import sqlite3
+    """Automatically update database with newly compiled application details."""
+    from src.db.database import get_db_connection, is_postgres
     
     if not updated_meta_paths:
         return
 
     db_path = os.path.join('data', 'karriere.db')
-    if not os.path.exists(db_path):
+    if not is_postgres() and not os.path.exists(db_path):
         return
 
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
 
         for meta_path in updated_meta_paths:

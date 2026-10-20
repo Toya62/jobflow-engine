@@ -11,6 +11,7 @@ import sqlite3
 import pandas as pd
 
 from src.core.logger import get_logger
+from src.db.database import get_db_connection, is_postgres, setup_db
 
 logger = get_logger(__name__)
 
@@ -27,11 +28,11 @@ def sync_dismissals_from_json(db_path: str = "data/karriere.db") -> int:
 
 
 def load_dismissed_df() -> pd.DataFrame:
-    """Load manually dismissed jobs from SQLite."""
+    """Load manually dismissed jobs from database."""
     db_path = os.path.join('data', 'karriere.db')
-    if os.path.exists(db_path):
+    if is_postgres() or os.path.exists(db_path):
         try:
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             q = '''
             SELECT j.url as job_url, j.company, j.title, e.status as gemini_status, e.summary as gemini_summary, e.evaluated_at
             FROM evaluations e
@@ -42,7 +43,7 @@ def load_dismissed_df() -> pd.DataFrame:
             conn.close()
             return df
         except Exception as e:
-            logger.warning(f"Could not load dismissed jobs from SQLite: {e}")
+            logger.warning(f"Could not load dismissed jobs from DB: {e}")
 
     return pd.DataFrame(columns=DISMISS_COLUMNS)
 
@@ -90,15 +91,15 @@ def add_to_dismissed(job_url: str = None, company: str = None, position: str = N
         if job_id:
             cursor.execute('''
             INSERT INTO evaluations (job_id, status, score, chance, archetype, matched_skills, gaps, summary, evaluated_at)
-            VALUES (?, 'USER_DISMISSED', 0, 'NONE', '', '', '', 'Manually dismissed by user from dashboard.', datetime('now'))
+            VALUES (?, 'USER_DISMISSED', 0, 'NONE', '', '', '', 'Manually dismissed by user from dashboard.', CURRENT_TIMESTAMP)
             ON CONFLICT(job_id) DO UPDATE SET
                 status = 'USER_DISMISSED',
                 summary = 'Manually dismissed by user from dashboard.',
-                evaluated_at = datetime('now')
+                evaluated_at = CURRENT_TIMESTAMP
             ''', (job_id,))
             conn.commit()
-            logger.info(f"Marked job #{job_id} as USER_DISMISSED in SQLite")
+            logger.info(f"Marked job #{job_id} as USER_DISMISSED in database")
         conn.close()
     except Exception as e:
-        logger.error(f"Failed to record dismissed job in SQLite: {e}")
+        logger.error(f"Failed to record dismissed job in database: {e}")
         raise

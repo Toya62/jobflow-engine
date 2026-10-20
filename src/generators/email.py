@@ -175,12 +175,12 @@ def _get_jobs_df():
 
 def lookup_job_details(company: str = "", position: str = "", job_url: str = "") -> dict:
     """Find the full job description and details from pipeline datasets or SQLite by URL or company+title."""
-    # 0. Check SQLite karriere.db first for fresh data
+    # 0. Check Database (PostgreSQL / SQLite) for fresh data
+    from src.db.database import get_db_connection, is_postgres
     db_path = "data/karriere.db"
-    if os.path.exists(db_path):
+    if is_postgres() or os.path.exists(db_path):
         try:
-            import sqlite3
-            with sqlite3.connect(db_path) as conn:
+            with get_db_connection(db_path) as conn:
                 cur = conn.cursor()
                 if job_url and not job_url.lower().startswith('mailto:'):
                     cur.execute(

@@ -44,10 +44,10 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
     db_path = "data/karriere.db"
     prev_max_id = 0
 
-    if os.path.exists(db_path):
+    from src.db.database import get_db_connection, is_postgres
+    if is_postgres() or os.path.exists(db_path):
         try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             row = conn.cursor().execute("SELECT COALESCE(MAX(id), 0) FROM jobs").fetchone()
             prev_max_id = row[0] if row else 0
             conn.close()
@@ -65,11 +65,10 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             pass
         return {"scraped": 0, "approved": 0}
 
-    # Measure newly added jobs in SQLite
-    if os.path.exists(db_path):
+    # Measure newly added jobs in Database
+    if is_postgres() or os.path.exists(db_path):
         try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             row = conn.cursor().execute("SELECT COUNT(*) FROM jobs WHERE id > ?", (prev_max_id,)).fetchone()
             scraped_count = row[0] if row else 0
             conn.close()
@@ -77,7 +76,7 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             pass
 
     if auto_ai:
-        # Check for ANY pending unevaluated jobs for this portal in SQLite
+        # Check for ANY pending unevaluated jobs for this portal in Database
         pending_count = 0
         p_filter = ""
         p = portal_name.lower().strip()
@@ -96,10 +95,9 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
         elif "indeed" in p:
             p_filter = "AND j.url LIKE '%indeed%'"
 
-        if os.path.exists(db_path):
+        if is_postgres() or os.path.exists(db_path):
             try:
-                import sqlite3
-                conn = sqlite3.connect(db_path)
+                conn = get_db_connection(db_path)
                 q_pending = f"""
                     SELECT COUNT(*) FROM jobs j
                     LEFT JOIN evaluations e ON j.id = e.job_id

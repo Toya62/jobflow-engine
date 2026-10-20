@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from src.core.logger import get_logger
+from src.db.database import get_db_connection, is_postgres
 from src.dashboard.applications import autoresolve_cv_pdf
 from src.dashboard.crm import (
     UNSET,
@@ -209,9 +210,9 @@ def delete_application(payload: ApplicationDeleteRequest | None = None, keep_job
                         except Exception as del_err:
                             logger.error(f"Failed to delete {rel_file}: {del_err}")
 
-        if os.path.exists(DB_PATH):
+        if is_postgres() or os.path.exists(DB_PATH):
             try:
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_db_connection(DB_PATH)
                 cur = conn.cursor()
                 if cv_pdf_path and str(cv_pdf_path).strip() not in ("N/A", "", "null"):
                     clean_cv = str(cv_pdf_path).replace("\\", "/").strip().lstrip('/')

@@ -145,11 +145,12 @@ def load_company_pool() -> list[str]:
         except Exception as e:
             logger.warning(f"Failed loading {SEED_FILE}: {e}")
 
-    # 2. Harvest from SQLite DB
+    # 2. Harvest from Database (PostgreSQL / SQLite)
+    from src.db.database import get_db_connection, is_postgres
     db_path = "data/karriere.db"
-    if os.path.exists(db_path):
+    if is_postgres() or os.path.exists(db_path):
         try:
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             c = conn.cursor()
             c.execute("SELECT url FROM jobs WHERE url LIKE '%personio%'")
             for (url,) in c.fetchall():

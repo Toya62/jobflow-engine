@@ -12,6 +12,7 @@ from datetime import datetime
 import pandas as pd
 
 from src.core.logger import get_logger
+from src.db.database import get_db_connection, is_postgres, setup_db
 
 logger = get_logger(__name__)
 
@@ -31,9 +32,9 @@ TRACKER_COLUMNS = [
 def load_tracker_df() -> pd.DataFrame:
     """Load the CRM tracker view (applications joined to their job)."""
     db_path = os.path.join('data', 'karriere.db')
-    if os.path.exists(db_path):
+    if is_postgres() or os.path.exists(db_path):
         try:
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             q = '''
             SELECT j.company, j.title as position, a.applied_at as date_applied,
                    'AI Generated' as source, j.url as job_url,
@@ -165,7 +166,7 @@ def upsert_tracker_row(company: str, position: str, job_url: str = "",
     missing database is initialized via ``setup_db`` when creating.
     """
     db_path = os.path.join('data', 'karriere.db')
-    if not os.path.exists(db_path) and not create:
+    if not is_postgres() and not os.path.exists(db_path) and not create:
         return False
 
     company = clean_cell(company)
@@ -179,11 +180,10 @@ def upsert_tracker_row(company: str, position: str, job_url: str = "",
 
     conn = None
     try:
-        if not os.path.exists(db_path):
-            from src.db.database import setup_db
+        if not is_postgres() and not os.path.exists(db_path):
             conn = setup_db(db_path)
         else:
-            conn = sqlite3.connect(db_path, timeout=10)
+            conn = get_db_connection(db_path)
         cursor = conn.cursor()
         cursor.execute("BEGIN IMMEDIATE")
 

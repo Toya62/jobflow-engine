@@ -340,11 +340,11 @@ def filter_seen_reposts(
     cutoff_str = cutoff_cross.strftime("%Y-%m-%d")
     seen: set[str] = set()
 
-    # 1. Primary: SQLite karriere.db
-    if db_path and os.path.exists(db_path):
+    # 1. Primary: Database (PostgreSQL / SQLite)
+    from src.db.database import get_db_connection, is_postgres
+    if is_postgres() or (db_path and os.path.exists(db_path)):
         try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT company, description FROM jobs WHERE scraped_at >= ? OR scraped_at IS NULL OR scraped_at = ''",
@@ -357,7 +357,7 @@ def filter_seen_reposts(
                     seen.add(f"{cn}|||{fp}")
             conn.close()
         except Exception as exc:
-            logger.warning(f"Could not load seen reposts from SQLite {db_path}: {exc}")
+            logger.warning(f"Could not load seen reposts from DB {db_path}: {exc}")
 
     if not seen:
         logger.info(f"  Repost (cross):     {before:4d} / {before} kept  (no entries in DB)")
@@ -393,11 +393,11 @@ def filter_seen_reposts_by_url(
     cutoff_str = cutoff_cross.strftime("%Y-%m-%d")
     seen_urls: set[str] = set()
 
-    # 1. Primary: SQLite karriere.db
-    if db_path and os.path.exists(db_path):
+    # 1. Primary: Database (PostgreSQL / SQLite)
+    from src.db.database import get_db_connection, is_postgres
+    if is_postgres() or (db_path and os.path.exists(db_path)):
         try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT url FROM jobs WHERE description IS NOT NULL AND length(trim(description)) > 10 AND (scraped_at >= ? OR scraped_at IS NULL OR scraped_at = '')",
@@ -410,7 +410,7 @@ def filter_seen_reposts_by_url(
                         seen_urls.add(clean_u)
             conn.close()
         except Exception as exc:
-            logger.warning(f"Could not load seen URLs from SQLite {db_path}: {exc}")
+            logger.warning(f"Could not load seen URLs from DB {db_path}: {exc}")
 
     if not seen_urls:
         logger.info(f"  Seen URL (cross):   {before:4d} / {before} kept  (no entries in DB)")
@@ -889,11 +889,11 @@ def filter_against_existing_catalog(
     seen_title_company: set[str] = set()
     seen_fingerprints: set[str] = set()
 
-    # 1. Primary Source of Truth: SQLite Database (data/karriere.db)
-    if db_path and os.path.exists(db_path):
+    # 1. Primary Source of Truth: Database (PostgreSQL / SQLite)
+    from src.db.database import get_db_connection, is_postgres
+    if is_postgres() or (db_path and os.path.exists(db_path)):
         try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT url, company, title, description FROM jobs")
             for u, c, t, d in cursor.fetchall():
@@ -911,7 +911,7 @@ def filter_against_existing_catalog(
                         seen_fingerprints.add(fp)
             conn.close()
         except Exception as exc:
-            logger.warning(f"Could not load existing jobs from SQLite {db_path}: {exc}")
+            logger.warning(f"Could not load existing jobs from DB {db_path}: {exc}")
 
     # 2. Legacy / fallback CSV catalog files
     if catalog_files is None:

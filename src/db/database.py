@@ -1,25 +1,214 @@
-import sqlite3
+"""Relational database layer for karriere-pipeline.
+
+Supports PostgreSQL as primary production database (when DATABASE_URL is set)
+with seamless SQLite fallback for local development and offline environments.
+"""
+
 import os
+import re
+import sqlite3
+from typing import Any
+
+try:
+    import psycopg2
+    import psycopg2.extras
+    HAS_PSYCOPG2 = True
+except ImportError:
+    HAS_PSYCOPG2 = False
 
 DB_PATH = "data/karriere.db"
 
 
-def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
-    """Create the schema (jobs / evaluations / applications) and covering
-    indexes if they do not already exist. Safe to call repeatedly."""
+def is_postgres() -> bool:
+    """Return True if DATABASE_URL is set and points to PostgreSQL."""
+    url = os.getenv("DATABASE_URL", "").strip().lower()
+    return url.startswith("postgres://") or url.startswith("postgresql://")
+
+
+def get_database_url() -> str:
+    """Return configured DATABASE_URL or empty string."""
+    return os.getenv("DATABASE_URL", "").strip()
+
+
+class PgCursorWrapper:
+    """Wrap psycopg2 cursor to provide SQLite-compatible execution semantics.
+    
+    Translates parameter placeholders ('?' -> '%s'), SQLite conflict syntax
+    ('INSERT OR IGNORE' -> 'ON CONFLICT DO NOTHING'), and dialect idioms.
+    """
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def execute(self, sql: str, params: Any = None):
+        pg_sql = sql
+
+        # 1. Ignore SQLite-specific transaction lock pragma
+        if pg_sql.strip().upper() == "BEGIN IMMEDIATE":
+            return None
+
+        # 2. Translate INSERT OR IGNORE
+        if "INSERT OR IGNORE INTO" in pg_sql.upper():
+            pg_sql = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', pg_sql, flags=re.I)
+            if "ON CONFLICT" not in pg_sql.upper():
+                pg_sql += " ON CONFLICT DO NOTHING"
+
+        # 3. Translate INSERT OR REPLACE
+        if "INSERT OR REPLACE INTO" in pg_sql.upper():
+            if "applications" in pg_sql.lower() and "ON CONFLICT" not in pg_sql.upper():
+                pg_sql = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', pg_sql, flags=re.I)
+                pg_sql += (
+                    " ON CONFLICT (job_id) DO UPDATE SET "
+                    "cv_pdf_path = EXCLUDED.cv_pdf_path, "
+                    "cover_pdf_path = EXCLUDED.cover_pdf_path, "
+                    "applied_at = EXCLUDED.applied_at, "
+                    "notes = EXCLUDED.notes, "
+                    "status = EXCLUDED.status"
+                )
+            else:
+                pg_sql = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', pg_sql, flags=re.I)
+
+        # 4. Translate SQLite datetime('now') -> CURRENT_TIMESTAMP
+        if "datetime('now')" in pg_sql:
+            pg_sql = pg_sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
+
+        # 5. Translate ? parameter placeholders to %s for PostgreSQL
+        if params is not None and "?" in pg_sql:
+            pg_sql = pg_sql.replace("?", "%s")
+
+        return self._cur.execute(pg_sql, params)
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def fetchmany(self, size=None):
+        return self._cur.fetchmany(size) if size else self._cur.fetchmany()
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def lastrowid(self):
+        return getattr(self._cur, "lastrowid", None)
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    def close(self):
+        return self._cur.close()
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
+class PgConnectionWrapper:
+    """Wrap psycopg2 connection to mimic Python DB-API and SQLite connection semantics."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return PgCursorWrapper(self._conn.cursor())
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
+
+    def execute(self, sql: str, params: Any = None):
+        cur = self.cursor()
+        cur.execute(sql, params)
+        return cur
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
+
+
+def get_db_connection(db_path: str | os.PathLike[str] = DB_PATH):
+    """Factory returning an active database connection.
+    
+    If DATABASE_URL points to PostgreSQL, connects to PostgreSQL.
+    Otherwise, falls back to SQLite at db_path.
+    """
+    if is_postgres():
+        if not HAS_PSYCOPG2:
+            raise RuntimeError("psycopg2 is required when DATABASE_URL points to PostgreSQL.")
+        pg_url = get_database_url()
+        conn = psycopg2.connect(pg_url)
+        return PgConnectionWrapper(conn)
+
     db_path = os.fspath(db_path)
     parent_dir = os.path.dirname(db_path)
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
     conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("PRAGMA journal_mode = WAL;")
-        cursor.execute("PRAGMA busy_timeout = 5000;")
-        cursor.execute("PRAGMA synchronous = NORMAL;")
-    except Exception:
-        pass
+    return conn
 
+
+def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
+    """Create schema (jobs / evaluations / applications) and covering indexes.
+    Safe to call repeatedly across PostgreSQL or SQLite."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+
+    if is_postgres():
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS jobs (
+            id SERIAL PRIMARY KEY,
+            company TEXT NOT NULL,
+            title TEXT NOT NULL,
+            url TEXT,
+            location TEXT,
+            description TEXT,
+            scraped_at TEXT,
+            CONSTRAINT unq_jobs_url_company_title UNIQUE (url, company, title)
+        );
+        CREATE TABLE IF NOT EXISTS evaluations (
+            id SERIAL PRIMARY KEY,
+            job_id INTEGER UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+            status TEXT,
+            score INTEGER,
+            chance TEXT,
+            archetype TEXT,
+            matched_skills TEXT,
+            gaps TEXT,
+            summary TEXT,
+            evaluated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS applications (
+            id SERIAL PRIMARY KEY,
+            job_id INTEGER UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+            cv_pdf_path TEXT,
+            cover_pdf_path TEXT,
+            status TEXT DEFAULT 'Prepared',
+            applied_at TEXT,
+            notes TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_jobs_scraped_at ON jobs(scraped_at);
+        CREATE INDEX IF NOT EXISTS idx_jobs_url ON jobs(url);
+        CREATE INDEX IF NOT EXISTS idx_evaluations_job_status ON evaluations(job_id, status);
+        CREATE INDEX IF NOT EXISTS idx_evaluations_status ON evaluations(status);
+        CREATE INDEX IF NOT EXISTS idx_applications_job_status ON applications(job_id, status);
+        ''')
+        conn.commit()
+        return conn
+
+    # SQLite
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS jobs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,9 +253,6 @@ def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
     )
     ''')
 
-    # Cover the hot query paths. The dashboard's dataset views all do
-    # `jobs LEFT JOIN evaluations` and filter/sort on scraped_at; without
-    # these every request scans the whole table.
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_jobs_scraped_at ON jobs(scraped_at)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_jobs_url ON jobs(url)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_evaluations_job_status ON evaluations(job_id, status)')
@@ -78,14 +264,7 @@ def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
 
 
 def normalize_scraped_at(value) -> str:
-    """Coerce any scraped_at shape onto the canonical '%Y-%m-%d %H:%M:%S' form.
-
-    Accepts ISO-8601 ('2026-09-14T16:08:29.349495'), space-separated
-    ('2026-09-14 16:08:29'), and bare dates ('2026-09-14'). Returns '' for
-    anything unparseable so callers can distinguish "never scraped" from
-    "scraped at an unknown time" — the distinction matters because the
-    dashboard must not backfill a missing timestamp with today's date.
-    """
+    """Coerce any scraped_at shape onto the canonical '%Y-%m-%d %H:%M:%S' form."""
     text = str(value or "").strip()
     if not text or text.lower() in ("nan", "none", "nat", "", "invalid"):
         return ""
@@ -99,8 +278,8 @@ def normalize_scraped_at(value) -> str:
 
 
 def save_jobs_to_db(df, db_path: str | os.PathLike[str] = DB_PATH) -> int:
-    """Persist scraped jobs directly into SQLite. Returns the count of newly
-    inserted rows (INSERT OR IGNORE skips existing (url, company, title) keys)."""
+    """Persist scraped jobs directly into database (PostgreSQL or SQLite).
+    Returns count of newly inserted rows."""
     if df is None or len(df) == 0:
         return 0
     conn = setup_db(db_path)
@@ -126,7 +305,6 @@ def save_jobs_to_db(df, db_path: str | os.PathLike[str] = DB_PATH) -> int:
             )
             existing_row = cursor.fetchone()
             if existing_row:
-                # Job already known under another URL; skip inserting duplicate row
                 continue
 
             cursor.execute(
@@ -163,16 +341,15 @@ def save_jobs_to_db(df, db_path: str | os.PathLike[str] = DB_PATH) -> int:
 
 
 def merge_databases(source_db_path: str, target_db_path: str | os.PathLike[str] = DB_PATH) -> dict:
-    """Natively merges source_db_path into target_db_path using SQLite ATTACH.
-    Merges new jobs, updates missing descriptions, merges evaluations,
-    and preserves all local applications and custom notes."""
+    """Natively merges source SQLite database into target SQLite database."""
     if not os.path.exists(source_db_path):
         return {"merged_jobs": 0, "merged_evaluations": 0, "merged_applications": 0}
 
-    conn = setup_db(target_db_path)
+    # Direct SQLite attach merge
+    abs_source = os.path.abspath(source_db_path)
+    conn = sqlite3.connect(os.fspath(target_db_path))
     cursor = conn.cursor()
 
-    abs_source = os.path.abspath(source_db_path)
     cursor.execute("ATTACH DATABASE ? AS source", (abs_source,))
 
     cursor.execute('''
@@ -224,9 +401,7 @@ def merge_databases(source_db_path: str, target_db_path: str | os.PathLike[str] 
 
 
 def sync_remote_git_db() -> bool:
-    """Fetch origin/main, extract its remote karriere.db, and merge into the
-    local DB natively. Returns False (without raising) if the remote has no
-    database or the fetch fails."""
+    """Fetch origin/main, extract its remote karriere.db, and merge locally."""
     import subprocess
     import tempfile
     try:

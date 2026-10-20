@@ -127,13 +127,14 @@ class KnownJobsIndex:
 
 def load_known_job_keys(db_path: str = "data/karriere.db") -> tuple[set[str], set[str]]:
     """Return (plain URLs, 'company|||title' keys) of applied/dismissed jobs for backward compatibility."""
+    from src.db.database import get_db_connection, is_postgres
     urls: set[str] = set()
     keys: set[str] = set()
-    if not db_path or not os.path.exists(db_path):
+    if not is_postgres() and (not db_path or not os.path.exists(db_path)):
         return urls, keys
     conn = None
     try:
-        conn = sqlite3.connect(db_path, timeout=10)
+        conn = get_db_connection(db_path)
         rows = conn.execute(
             """
             SELECT j.url, j.company, j.title FROM jobs j
@@ -159,13 +160,14 @@ def load_known_job_keys(db_path: str = "data/karriere.db") -> tuple[set[str], se
 
 def load_known_jobs_index(db_path: str = "data/karriere.db") -> KnownJobsIndex:
     """Load an in-memory KnownJobsIndex with exact URLs and normalized company+title pairs."""
+    from src.db.database import get_db_connection, is_postgres
     urls: set[str] = set()
     records: list[dict[str, Any]] = []
-    if not db_path or not os.path.exists(db_path):
+    if not is_postgres() and (not db_path or not os.path.exists(db_path)):
         return KnownJobsIndex(urls, records)
     conn = None
     try:
-        conn = sqlite3.connect(db_path, timeout=10)
+        conn = get_db_connection(db_path)
         rows = conn.execute(
             """
             SELECT j.url, j.company, j.title FROM jobs j

@@ -252,11 +252,10 @@ def _correct_mislabel(res: dict) -> dict:
     return res
 
 def save_evaluations_to_db(new_records: list, db_path: str = "data/karriere.db") -> None:
-    """Saves AI evaluation results directly into SQLite evaluations table without CSV."""
+    """Saves AI evaluation results directly into database evaluations table."""
     if not new_records:
         return
-    import sqlite3
-    from src.db.database import setup_db
+    from src.db.database import get_db_connection, setup_db
 
     conn = setup_db(db_path)
     cursor = conn.cursor()
@@ -373,12 +372,12 @@ def run_gemini_matcher(
     # Load already evaluated job identifiers to prevent duplicate API calls
     evaluated_keys = set()
 
-    # 1. Primary Source of Truth: SQLite Database (data/karriere.db)
+    # 1. Primary Source of Truth: Database (PostgreSQL / SQLite)
+    from src.db.database import get_db_connection, is_postgres
     db_path = os.path.join(output_dir, "karriere.db")
-    if os.path.exists(db_path):
+    if is_postgres() or os.path.exists(db_path):
         try:
-            import sqlite3
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT j.url, j.title, j.company 
@@ -486,13 +485,13 @@ def run_gemini_matcher_on_db(
     min_job_id: int | None = None,
     portal: str | None = None,
 ) -> list:
-    """Evaluates pending/unevaluated jobs directly from SQLite data/karriere.db."""
-    import sqlite3
-    if not os.path.exists(db_path):
+    """Evaluates pending/unevaluated jobs directly from database (PostgreSQL / SQLite)."""
+    from src.db.database import get_db_connection, is_postgres
+    if not is_postgres() and not os.path.exists(db_path):
         logger.error(f"Database not found: {db_path}")
         return []
 
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     params = []
     q = '''
     SELECT j.id, j.company, j.title, j.url as job_url, j.location, j.description, j.scraped_at

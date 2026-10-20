@@ -177,18 +177,19 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
 # Background workers
 # --------------------------------------------------------------------------- #
 def _prewarm_cache() -> None:
-    """Verify SQLite database connectivity at server startup."""
+    """Verify database connectivity at server startup."""
     def _load():
         try:
-            import sqlite3
+            from src.db.database import get_db_connection, is_postgres
             db_path = os.path.join('data', 'karriere.db')
-            if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path)
+            if is_postgres() or os.path.exists(db_path):
+                conn = get_db_connection(db_path)
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM jobs")
                 cnt = cursor.fetchone()[0]
                 conn.close()
-                logger.info(f"Database prewarm check: {cnt} jobs in SQLite data/karriere.db")
+                db_type = "PostgreSQL" if is_postgres() else "SQLite"
+                logger.info(f"Database prewarm check: {cnt} jobs in {db_type}")
         except Exception as e:
             logger.debug(f"Cache pre-warm check error: {e}")
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from src.core.logger import get_logger
 from src.dashboard.dismissals import sync_dismissals_from_json
 from src.dashboard.schemas import ApprovedIndexEntry, JobRecord
+from src.db.database import get_db_connection, is_postgres
 
 logger = get_logger(__name__)
 
@@ -113,9 +114,9 @@ def list_datasets():
 def approved_index():
     """Lightweight index of approved jobs for client-side lookups."""
     try:
-        if not os.path.exists(DB_PATH):
+        if not is_postgres() and not os.path.exists(DB_PATH):
             return []
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT j.title, j.company, j.url
@@ -143,8 +144,8 @@ def job_descriptions(
         target_urls = [u.strip() for u in urls.split(',') if u.strip()]
         desc_map = {}
 
-        if os.path.exists(DB_PATH):
-            conn = sqlite3.connect(DB_PATH)
+        if is_postgres() or os.path.exists(DB_PATH):
+            conn = get_db_connection(DB_PATH)
             cursor = conn.cursor()
 
             if target_urls:
@@ -269,7 +270,7 @@ def list_jobs(
             ORDER BY e.score DESC
             '''
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         df = pd.read_sql_query(q, conn)
         conn.close()
         df = clean_jobs_df(df)
