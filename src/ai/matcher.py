@@ -144,6 +144,19 @@ def evaluate_single_job(row: dict, client: genai.Client | None = None, model_nam
             "decision_summary": "Job description is empty or too short."
         }
 
+    # Immediate rejection for blacklisted companies / staffing agencies
+    company_lower = company.lower()
+    rejected_companies = getattr(config, "REJECTED_COMPANIES", {"jobgether", "jobtogether"})
+    if any(b in company_lower for b in rejected_companies):
+        return {
+            "status": "REJECTED_STAFFING_AGENCY",
+            "is_approved": False,
+            "interview_chance": "LOW",
+            "match_score": 0,
+            "recommended_doc_language": "GERMAN",
+            "decision_summary": f"Company '{company}' is blacklisted as an aggregator/staffing agency."
+        }
+
     matcher = ProfileMatcher()
     archetype_info = matcher.route_job(title, description)
 

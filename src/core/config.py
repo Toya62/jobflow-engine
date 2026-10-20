@@ -107,6 +107,12 @@ REJECT_JOB_TYPES = {
     "contract", "temporary", "volunteer",
 }
 
+# ── Blacklisted / Rejected companies & agencies ──────────────────────────────────────────
+REJECTED_COMPANIES = {
+    "jobgether",
+    "jobtogether",
+}
+
 # ── Load candidate profile ───────────────────────────────────────────────────────
 _base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PROFILE_YAML_PATH = os.path.join(_base_dir, "user_profile.yml")
