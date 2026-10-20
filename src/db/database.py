@@ -347,7 +347,7 @@ def merge_databases(source_db_path: str, target_db_path: str | os.PathLike[str] 
 
     # Direct SQLite attach merge
     abs_source = os.path.abspath(source_db_path)
-    conn = sqlite3.connect(os.fspath(target_db_path))
+    conn = setup_db(target_db_path)
     cursor = conn.cursor()
 
     cursor.execute("ATTACH DATABASE ? AS source", (abs_source,))

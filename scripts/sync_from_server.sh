@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Sync data/ and applications/ from Oracle Cloud server to local Mac
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+REMOTE_HOST="oracle-server"
+REMOTE_PATH="/opt/karriere-pipeline"
+
+echo "=== Syncing from ${REMOTE_HOST}:${REMOTE_PATH} ==="
+
+echo "--> Syncing data/..."
+rsync -avzP \
+  "${REMOTE_HOST}:${REMOTE_PATH}/data/" \
+  "${PROJECT_ROOT}/data/"
+
+echo "--> Syncing applications/..."
+rsync -avzP \
+  "${REMOTE_HOST}:${REMOTE_PATH}/applications/" \
+  "${PROJECT_ROOT}/applications/"
+
+echo "=== Sync completed successfully ==="
