@@ -89,7 +89,6 @@ def notify_scrape_summary(
     portal_breakdown: dict = None
 ) -> bool:
     """Format and send a structured scrape & match notification with German Local Time (CEST/CET)."""
-    dashboard_url = "https://YOUR_GITHUB_USERNAME.github.io/karriere-pipeline/"
     german_time_str = datetime.now(GERMAN_TZ).strftime("%d.%m.%Y, %H:%M CEST")
 
     breakdown_lines = []
@@ -108,8 +107,7 @@ def notify_scrape_summary(
         f"📦 *Total Scraped (This Run):* +{run_new_count}"
         f"{breakdown_text}\n"
         f"⭐ *AI Approved (Today):* {approved_count}\n"
-        f"📊 *Total Scraped (Today):* {new_jobs_count}\n\n"
-        f"🌐 *Open Dashboard:* {dashboard_url}"
+        f"📊 *Total Scraped (Today):* {new_jobs_count}"
     )
     return send_whatsapp_alert(msg)
 
