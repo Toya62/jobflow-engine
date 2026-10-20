@@ -28,7 +28,8 @@ def test_pull_command_uses_git_only(monkeypatch, capsys):
 
     handle_pull(SimpleNamespace())
 
-    assert calls == [(["git", "pull", "--rebase", "origin", "main"], {"check": True})]
+    assert (["git", "pull", "--rebase", "origin", "main"], {"check": True}) in calls
+    assert all(call[0][0] == "git" for call in calls)
     assert "S3" not in capsys.readouterr().out
 
 

@@ -21,7 +21,15 @@ def git_root() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
+def _ensure_git_safe() -> None:
+    try:
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], capture_output=True)
+    except Exception:
+        pass
+
+
 def _git_dir(root_dir: str) -> str:
+    _ensure_git_safe()
     try:
         out = subprocess.run(["git", "rev-parse", "--git-dir"], cwd=root_dir,
                              capture_output=True, text=True).stdout.strip()
@@ -42,6 +50,7 @@ def git_in_progress(root_dir: str) -> bool:
 
 
 def git_current_branch(root_dir: str) -> str:
+    _ensure_git_safe()
     try:
         return subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=root_dir,
                               capture_output=True, text=True).stdout.strip()

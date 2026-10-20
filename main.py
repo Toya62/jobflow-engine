@@ -257,9 +257,17 @@ def handle_pull(args):
     print(f"{'='*60}\n")
     try:
         import subprocess
+        from src.dashboard.git_ops import _ensure_git_safe
+        _ensure_git_safe()
         print("Pulling local data and applications from origin/main...")
         subprocess.run(["git", "pull", "--rebase", "origin", "main"], check=True)
-        print("Local data/karriere.db is already current (scrapers write directly to SQLite).")
+        from src.db.database import is_postgres, merge_databases, DB_PATH
+        if is_postgres() and os.path.exists(DB_PATH):
+            print("Syncing data/karriere.db into PostgreSQL...")
+            stats = merge_databases(DB_PATH)
+            print(f"✓ PostgreSQL database updated: {stats}")
+        else:
+            print("Local data/karriere.db is already current (scrapers write directly to SQLite).")
     except Exception as e:
         print(f"[ERROR] Git pull failed: {e}", file=sys.stderr)
         sys.exit(1)

@@ -117,3 +117,80 @@ def test_pg_connection_context_manager_rollback_on_error():
             raise ValueError("Test error")
 
     mock_conn.rollback.assert_called_once()
+
+
+def test_merge_databases_postgres_mode(tmp_path, monkeypatch):
+    import sqlite3
+    from src.db.database import merge_databases
+
+    # Create dummy source SQLite DB
+    src_db = str(tmp_path / "source.db")
+    s_conn = sqlite3.connect(src_db)
+    s_cur = s_conn.cursor()
+    s_cur.execute("""
+        CREATE TABLE jobs (
+            id INTEGER PRIMARY KEY,
+            company TEXT,
+            title TEXT,
+            url TEXT,
+            location TEXT,
+            description TEXT,
+            scraped_at TEXT
+        )
+    """)
+    s_cur.execute("""
+        CREATE TABLE evaluations (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER,
+            status TEXT,
+            score INTEGER,
+            chance TEXT,
+            archetype TEXT,
+            matched_skills TEXT,
+            gaps TEXT,
+            summary TEXT,
+            evaluated_at TEXT
+        )
+    """)
+    s_cur.execute("""
+        CREATE TABLE applications (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER,
+            cv_pdf_path TEXT,
+            cover_pdf_path TEXT,
+            applied_at TEXT,
+            notes TEXT,
+            status TEXT
+        )
+    """)
+    s_cur.execute("""
+        INSERT INTO jobs (id, company, title, url, location, description, scraped_at)
+        VALUES (1, 'Acme Corp', 'Engineer', 'https://acme.corp/1', 'Remote', 'Extensive job description with more than fifty characters here.', '2026-10-20')
+    """)
+    s_cur.execute("""
+        INSERT INTO evaluations (id, job_id, status, score, chance, archetype, matched_skills, gaps, summary, evaluated_at)
+        VALUES (1, 1, 'APPROVED', 90, 'HIGH', 'backend_platform', 'Python', 'None', 'Great', '2026-10-20')
+    """)
+    s_cur.execute("""
+        INSERT INTO applications (id, job_id, cv_pdf_path, cover_pdf_path, applied_at, notes, status)
+        VALUES (1, 1, 'cv.pdf', 'cover.pdf', '2026-10-20', 'notes', 'Applied')
+    """)
+    s_conn.commit()
+    s_conn.close()
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/testdb")
+    mock_cur = mock.MagicMock()
+    mock_cur.rowcount = 1
+    mock_cur.fetchone.return_value = (10,)
+    mock_conn = mock.MagicMock()
+    mock_conn.cursor.return_value = mock_cur
+
+    with mock.patch("src.db.database.setup_db", return_value=mock_conn):
+        stats = merge_databases(src_db)
+
+    assert stats["merged_jobs"] == 1
+    assert stats["merged_evaluations"] == 1
+    assert stats["merged_applications"] == 1
+    assert mock_conn.commit.called
+    assert mock_conn.close.called
+

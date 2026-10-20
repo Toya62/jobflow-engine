@@ -6,14 +6,9 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./data:/app/data
-      - ./applications:/app/applications
-      - ./user_profile.yml:/app/user_profile.yml
-      - ./filter_config.yml:/app/filter_config.yml
-      - ./templates:/app/templates
+      - .:/app
       - /app/dashboard/app
-      - ./src:/app/src
-      - ./main.py:/app/main.py
+      - /app/.venv
     env_file:
       - .env
     environment:

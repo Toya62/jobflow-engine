@@ -19,8 +19,14 @@ def pull_and_sync():
     root_dir = git_root()
     try:
         ok, detail = safe_pull_rebase(root_dir)
+        if not ok:
+            return JSONResponse(status_code=400, content={
+                "success": False,
+                "message": f"Sync failed: {detail}",
+                "output": detail,
+            })
 
-        # Automatically ingest newly pulled jobs and evaluations into SQLite.
+        # Automatically ingest newly pulled jobs and evaluations into database.
         try:
             from src.db import sync_remote_git_db
             sync_remote_git_db()
@@ -28,10 +34,11 @@ def pull_and_sync():
             logger.warning(f"Database sync after git pull encountered warning: {sync_err}")
 
         CACHE["jobs"].clear()
+        from src.db.database import is_postgres
+        db_type = "PostgreSQL" if is_postgres() else "SQLite"
         return {
             "success": True,
-            "message": ("Successfully synchronized with GitHub origin/main and updated SQLite database!"
-                        if ok else f"Sync skipped: {detail}"),
+            "message": f"Successfully synchronized with GitHub origin/main and updated {db_type} database!",
             "output": detail,
         }
     except Exception as e:

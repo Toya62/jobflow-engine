@@ -347,14 +347,90 @@ def save_jobs_to_db(df, db_path: str | os.PathLike[str] = DB_PATH) -> int:
 
 
 def merge_databases(source_db_path: str, target_db_path: str | os.PathLike[str] = DB_PATH) -> dict:
-    """Natively merges source SQLite database into target SQLite database."""
+    """Natively merges source SQLite database into target database (PostgreSQL or SQLite)."""
     if not os.path.exists(source_db_path):
         return {"merged_jobs": 0, "merged_evaluations": 0, "merged_applications": 0}
 
-    # Direct SQLite attach merge
     abs_source = os.path.abspath(source_db_path)
     conn = setup_db(target_db_path)
     cursor = conn.cursor()
+
+    if is_postgres():
+        import sqlite3
+        s_conn = sqlite3.connect(abs_source)
+        s_cur = s_conn.cursor()
+
+        # 1. Merge jobs
+        s_cur.execute("SELECT company, title, url, location, description, scraped_at FROM jobs")
+        jobs = s_cur.fetchall()
+        merged_jobs = 0
+        for comp, title, url, loc, desc, scraped in jobs:
+            cursor.execute("""
+            INSERT OR IGNORE INTO jobs (company, title, url, location, description, scraped_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (comp, title, url, loc, desc, scraped))
+            if cursor.rowcount > 0:
+                merged_jobs += 1
+
+        # 2. Update empty descriptions
+        s_cur.execute("""
+        SELECT company, title, description FROM jobs
+        WHERE description IS NOT NULL AND length(description) >= 50
+        """)
+        for comp, title, desc in s_cur.fetchall():
+            cursor.execute("""
+            UPDATE jobs SET description = ?
+            WHERE company = ? AND title = ?
+              AND (description IS NULL OR description = '' OR length(description) < 50)
+            """, (desc, comp, title))
+
+        # 3. Merge evaluations
+        s_cur.execute("""
+        SELECT s_j.company, s_j.title, s_e.status, s_e.score, s_e.chance, s_e.archetype, s_e.matched_skills, s_e.gaps, s_e.summary, s_e.evaluated_at
+        FROM evaluations s_e
+        JOIN jobs s_j ON s_e.job_id = s_j.id
+        """)
+        evals = s_cur.fetchall()
+        merged_evals = 0
+        for comp, title, status, score, chance, arch, matched, gaps, summ, eval_at in evals:
+            cursor.execute("SELECT id FROM jobs WHERE company = ? AND title = ? LIMIT 1", (comp, title))
+            row = cursor.fetchone()
+            if row:
+                cursor.execute("""
+                INSERT OR IGNORE INTO evaluations (job_id, status, score, chance, archetype, matched_skills, gaps, summary, evaluated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (row[0], status, score, chance, arch, matched, gaps, summ, eval_at))
+                if cursor.rowcount > 0:
+                    merged_evals += 1
+
+        # 4. Merge applications
+        s_cur.execute("""
+        SELECT s_j.company, s_j.title, s_a.cv_pdf_path, s_a.cover_pdf_path, s_a.applied_at, s_a.notes, s_a.status
+        FROM applications s_a
+        JOIN jobs s_j ON s_a.job_id = s_j.id
+        """)
+        apps = s_cur.fetchall()
+        merged_apps = 0
+        for comp, title, cv_path, cover_path, app_at, notes, status in apps:
+            cursor.execute("SELECT id FROM jobs WHERE company = ? AND title = ? LIMIT 1", (comp, title))
+            row = cursor.fetchone()
+            if row:
+                cursor.execute("""
+                INSERT OR IGNORE INTO applications (job_id, cv_pdf_path, cover_pdf_path, applied_at, notes, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (row[0], cv_path, cover_path, app_at, notes, status))
+                if cursor.rowcount > 0:
+                    merged_apps += 1
+
+        conn.commit()
+        conn.close()
+        s_conn.close()
+
+        return {
+            "merged_jobs": merged_jobs,
+            "merged_evaluations": merged_evals,
+            "merged_applications": merged_apps,
+        }
 
     cursor.execute("ATTACH DATABASE ? AS source", (abs_source,))
 
@@ -407,9 +483,14 @@ def merge_databases(source_db_path: str, target_db_path: str | os.PathLike[str] 
 
 
 def sync_remote_git_db() -> bool:
-    """Fetch origin/main, extract its remote karriere.db, and merge locally."""
+    """Fetch origin/main, extract its remote karriere.db, and merge locally.
+    When PostgreSQL is configured, also merges data/karriere.db if present."""
     import subprocess
     import tempfile
+    try:
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], capture_output=True)
+    except Exception:
+        pass
     try:
         subprocess.run(["git", "fetch", "origin", "main"], check=True, capture_output=True)
         show_proc = subprocess.run(["git", "show", "origin/main:data/karriere.db"], capture_output=True)
@@ -423,6 +504,11 @@ def sync_remote_git_db() -> bool:
             finally:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
+
+        if is_postgres() and os.path.exists(DB_PATH):
+            stats = merge_databases(DB_PATH)
+            print(f"✓ Local SQLite database merged into PostgreSQL: {stats}")
+
         return True
     except Exception as exc:
         print(f"Warning: remote SQLite sync encountered an error: {exc}")
