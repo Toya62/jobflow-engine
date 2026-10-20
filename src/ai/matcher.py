@@ -544,9 +544,14 @@ def run_gemini_matcher_on_db(
             "evaluated_at": res.get("evaluated_at", get_german_timestamp_str())
         }
 
+        save_evaluations_to_db([enriched_record], db_path=db_path)
+        title = str(row_dict.get('title', 'Unknown'))[:40]
+        company = str(row_dict.get('company', 'Unknown'))[:25]
         if is_approved or status in ("APPROVED", "MANUAL_REVIEW"):
+            print(f"[{idx}/{total_jobs}] 🟢 {company} - {title}: APPROVED ({score}%)")
             approved_list.append(enriched_record)
         else:
+            print(f"[{idx}/{total_jobs}] 🔴 {company} - {title}: {status}")
             rejected_list.append(enriched_record)
 
         if idx < total_jobs and rate_limit_delay > 0:
