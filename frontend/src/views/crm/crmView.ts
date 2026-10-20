@@ -321,14 +321,14 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
     });
     selectCell.appendChild(checkbox);
 
-    const companyCell = element("div", "kjc-cell kjc-col-title");
-    const titleButton = element("button", "kjc-link-btn", String(record.company || ""));
+    const positionCell = element("div", "kjc-cell kjc-col-title");
+    const titleButton = element("button", "kjc-link-btn", String(record.position || ""));
     titleButton.type = "button";
     titleButton.title = "Show job description";
     titleButton.addEventListener("click", () => drawer.open(record));
-    companyCell.appendChild(titleButton);
+    positionCell.appendChild(titleButton);
 
-    const positionCell = element("div", "kjc-cell kjc-col-company", String(record.position || ""));
+    const companyCell = element("div", "kjc-cell kjc-col-company", String(record.company || ""));
 
     // Native <select>: always visible, never clipped by the virtualized viewport.
     const statusCell = element("div", "kjc-cell kjc-col-status kjc-status-cell");
@@ -417,7 +417,7 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
     });
     filesCell.appendChild(deleteRowButton);
 
-    row.append(selectCell, companyCell, positionCell, statusCell, dateCell, applyCell, filesCell);
+    row.append(selectCell, positionCell, companyCell, statusCell, dateCell, applyCell, filesCell);
     return row;
   }
 

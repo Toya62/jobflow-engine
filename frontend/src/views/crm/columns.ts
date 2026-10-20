@@ -6,7 +6,7 @@ export const CRM_ROW_HEIGHT = 44;
 
 /** Single source of truth for the grid layout; applied inline to head and rows. */
 export const CRM_GRID_TEMPLATE =
-  "40px minmax(160px, 1.4fr) minmax(200px, 2fr) 150px 110px 100px minmax(110px, 0.8fr)";
+  "40px minmax(200px, 2fr) minmax(160px, 1.4fr) 150px 110px 100px minmax(110px, 0.8fr)";
 
 export interface CrmColumn {
   key: keyof TrackerRecord | "select" | "date_created" | "apply" | "artifacts";
@@ -17,8 +17,8 @@ export interface CrmColumn {
 
 export const CRM_COLUMNS: CrmColumn[] = [
   { key: "select", label: "", sortable: false, className: "kjc-col-select" },
-  { key: "company", label: "Company", sortable: true, className: "kjc-col-title" },
-  { key: "position", label: "Position", sortable: true, className: "kjc-col-company" },
+  { key: "position", label: "Position", sortable: true, className: "kjc-col-title" },
+  { key: "company", label: "Company", sortable: true, className: "kjc-col-company" },
   { key: "status", label: "Status", sortable: true, className: "kjc-col-status" },
   { key: "date_created", label: "Date Created", sortable: true, className: "kjc-col-date" },
   { key: "apply", label: "Apply", sortable: false, className: "kjc-col-link" },
