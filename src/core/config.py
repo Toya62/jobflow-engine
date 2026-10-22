@@ -57,6 +57,12 @@ INDEED_RESULTS_WANTED   = 100
 BA_MAX_RESULTS          = 100  # per query; v6 can return up to 100/page so usually 1 call
 CROSS_REPOST_DAYS       = 7
 
+# ── AI matching ─────────────────────────────────────────────────────────────────
+# Cheap title-based rejection before any AI call (set AI_PREFILTER=0 to disable).
+AI_PREFILTER_ENABLED = os.environ.get("AI_PREFILTER", "1").strip().lower() not in ("0", "false", "no", "off")
+# Only jobs scraped within this many days are matched when matching auto-runs after a scraper.
+AUTO_MATCH_MAX_AGE_DAYS = 1
+
 # ── Output file paths ───────────────────────────────────────────────────────────
 LATEST_LINKEDIN   = "data/linkedin_latest.csv"
 ALL_TIME_LINKEDIN = "data/linkedin_all_time.csv"

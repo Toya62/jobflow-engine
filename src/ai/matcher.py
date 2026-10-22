@@ -16,7 +16,7 @@ import json
 import time
 import argparse
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 try:
     from google import genai
     from google.genai import types
@@ -29,7 +29,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.core.logger import get_logger
 import src.config as config
 from src.ai.router import route_ai_evaluation, get_router_status
+from src.ai.prefilter import prefilter_job
 from src.core.profile_matcher import ProfileMatcher
+from src.core.utils import GERMAN_TZ
 
 logger = get_logger("gemini_matcher")
 
@@ -170,6 +172,11 @@ def evaluate_single_job(row: dict, client: genai.Client | None = None, model_nam
             "recommended_doc_language": "GERMAN",
             "decision_summary": f"Company '{company}' is blacklisted as an aggregator/staffing agency."
         }
+
+    if getattr(config, "AI_PREFILTER_ENABLED", True):
+        pre = prefilter_job(title, description)
+        if pre:
+            return pre
 
     matcher = ProfileMatcher()
     archetype_info = matcher.route_job(title, description)
@@ -471,10 +478,21 @@ def run_gemini_matcher(
 
     return approved_list
 
-def run_auto_matching_on_latest(portal: str = "all", db_path: str = "data/karriere.db"):
-    """Evaluates pending unevaluated jobs directly from SQLite data/karriere.db."""
+def run_auto_matching_on_latest(
+    portal: str = "all",
+    db_path: str = "data/karriere.db",
+    max_age_days: int | None = None,
+    min_job_id: int | None = None,
+):
+    """Evaluates pending unevaluated jobs directly from SQLite data/karriere.db.
+
+    Called automatically after a scraper finishes: unless min_job_id is given, only jobs
+    scraped within the last ``max_age_days`` (default: config.AUTO_MATCH_MAX_AGE_DAYS) are matched.
+    """
+    if max_age_days is None and min_job_id is None:
+        max_age_days = getattr(config, "AUTO_MATCH_MAX_AGE_DAYS", 1)
     print(f"\n▶ Directly processing unevaluated jobs in SQLite ({db_path}) for portal: {portal}")
-    return run_gemini_matcher_on_db(db_path=db_path)
+    return run_gemini_matcher_on_db(db_path=db_path, max_age_days=max_age_days, min_job_id=min_job_id)
 
 
 def run_gemini_matcher_on_db(
@@ -484,8 +502,12 @@ def run_gemini_matcher_on_db(
     db_path: str = "data/karriere.db",
     min_job_id: int | None = None,
     portal: str | None = None,
+    max_age_days: int | None = None,
 ) -> list:
-    """Evaluates pending/unevaluated jobs directly from database (PostgreSQL / SQLite)."""
+    """Evaluates pending/unevaluated jobs directly from database (PostgreSQL / SQLite).
+
+    If max_age_days is set, only jobs whose scraped_at lies within that many days are selected.
+    """
     from src.db.database import get_db_connection, is_postgres
     if not is_postgres() and not os.path.exists(db_path):
         logger.error(f"Database not found: {db_path}")
@@ -519,6 +541,12 @@ def run_gemini_matcher_on_db(
     if min_job_id is not None and min_job_id > 0:
         q += ' AND j.id >= ?'
         params.append(min_job_id)
+    if max_age_days is not None and max_age_days > 0:
+        # scraped_at is stored as 'YYYY-MM-DD HH:MM:SS' text on both SQLite and PostgreSQL,
+        # so a string comparison against a Python-computed cutoff works on both ('?' is translated for PG).
+        cutoff = (datetime.now(GERMAN_TZ) - timedelta(days=max_age_days)).strftime("%Y-%m-%d %H:%M:%S")
+        q += ' AND j.scraped_at >= ?'
+        params.append(cutoff)
     q += ' ORDER BY j.id DESC'
 
     df = pd.read_sql_query(q, conn, params=params if params else None)
@@ -548,6 +576,18 @@ def run_gemini_matcher_on_db(
         row_dict["job_id"] = row["id"]  # explicitly assign job_id from SQLite primary key
         res = evaluate_single_job(row_dict, client=client, model_name=model_name)
         if not res:
+            router_status = get_router_status()
+            if router_status.get("all_disabled"):
+                msg = (f"All AI providers are disabled (non-retryable errors: {router_status.get('disabled_providers')}). "
+                       f"Aborting matching batch after {idx - 1}/{total_jobs} jobs.")
+                logger.error(msg)
+                print(f"⛔ {msg}")
+                try:
+                    from src.core.notifier import send_whatsapp_alert
+                    send_whatsapp_alert(f"⚠️ *AI Matcher Aborted*\n\n{msg}")
+                except Exception as e:
+                    logger.warning(f"Could not send WhatsApp alert for aborted matcher: {e}")
+                break
             continue
 
         is_approved = res.get("is_approved", False) or str(res.get("status", "")).startswith("APPROVED")
@@ -606,8 +646,18 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="gemini-3.1-flash-lite", help="Gemini model ID")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of jobs to evaluate (for testing)")
     parser.add_argument("--delay", type=float, default=4.1, help="Delay between API calls in seconds (default: 4.1 for 15 RPM)")
+    parser.add_argument("--max-age-days", type=int, default=None, help="Only evaluate jobs scraped within the last N days from the SQLite DB (default: no limit; uses the CSV workflow if omitted)")
 
     args = parser.parse_args()
+    if args.max_age_days is not None:
+        run_gemini_matcher_on_db(
+            model_name=args.model,
+            limit=args.limit,
+            rate_limit_delay=args.delay,
+            db_path=os.path.join(args.outdir, "karriere.db"),
+            max_age_days=args.max_age_days,
+        )
+        sys.exit(0)
     run_gemini_matcher(
         input_csv=args.file,
         output_dir=args.outdir,
