@@ -117,9 +117,14 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             print(f"{'='*60}\n")
             try:
                 from src.ai.matcher import run_gemini_matcher_on_db
+                from src.config import AUTO_MATCH_MAX_AGE_DAYS
+                # Prefer jobs added by this scrape; otherwise fall back to a recency window.
+                new_jobs_only = prev_max_id > 0
                 approved_jobs = run_gemini_matcher_on_db(
                     db_path=db_path,
-                    portal=portal_name
+                    portal=portal_name,
+                    min_job_id=prev_max_id + 1 if new_jobs_only else None,
+                    max_age_days=None if new_jobs_only else AUTO_MATCH_MAX_AGE_DAYS,
                 )
                 approved_count = len(approved_jobs) if approved_jobs else 0
             except Exception as e:
@@ -235,7 +240,8 @@ def handle_match(args):
             limit=args.limit,
             rate_limit_delay=args.delay,
             db_path=db_path,
-            portal=getattr(args, "portal", None)
+            portal=getattr(args, "portal", None),
+            max_age_days=getattr(args, "max_age_days", None),
         )
 
 
@@ -372,6 +378,12 @@ def main():
         type=str,
         default=None,
         help="Filter pending jobs to evaluate by portal (e.g. arbeitnow, linkedin, xing, personio)"
+    )
+    match_parser.add_argument(
+        "--max-age-days",
+        type=int,
+        default=None,
+        help="Only evaluate jobs scraped within the last N days (default: all pending jobs)"
     )
 
 # Dashboard parser

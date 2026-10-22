@@ -20,6 +20,9 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("ai_router")
 
+# HTTP statuses that will not fix themselves during a run (bad key, no credit, no access, bad model).
+NON_RETRYABLE_STATUSES = frozenset({401, 402, 403, 404})
+
 class AIRouter:
     def __init__(self):
         self.keys = self._load_keys()
@@ -35,6 +38,50 @@ class AIRouter:
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant"
         ]
+        # Maps a provider ("groq") or provider/model ("groq/llama-3.1-8b-instant") to the reason it was disabled.
+        self.disabled: Dict[str, str] = {}
+        self._dead_gemini_keys: set = set()
+
+    def _is_disabled(self, provider: str, model: Optional[str] = None) -> bool:
+        return provider in self.disabled or (model is not None and f"{provider}/{model}" in self.disabled)
+
+    def _disable_on_fatal_error(self, provider: str, model: Optional[str], exc: Exception, key: Optional[str] = None) -> None:
+        """Disable a provider/model for the rest of the process on a non-retryable HTTP status (logged once)."""
+        if not isinstance(exc, urllib.error.HTTPError) or exc.code not in NON_RETRYABLE_STATUSES:
+            return
+        if provider == "gemini" and exc.code != 404 and key and len(self.keys.get("gemini", [])) > 1:
+            # One bad key must not take down the other Gemini keys.
+            if key not in self._dead_gemini_keys:
+                self._dead_gemini_keys.add(key)
+                logger.warning(f"A Gemini API key was disabled for the rest of this run (HTTP {exc.code}); it will be skipped silently.")
+            if all(k in self._dead_gemini_keys for k in self.keys["gemini"]):
+                self.disabled.setdefault("gemini", f"HTTP {exc.code}")
+            return
+        # 404 means the specific model is unknown; other statuses affect the whole provider (key/credit/access).
+        target = f"{provider}/{model}" if exc.code == 404 and model else provider
+        if target in self.disabled:
+            return
+        self.disabled[target] = f"HTTP {exc.code}"
+        logger.warning(f"AI provider '{target}' disabled for the rest of this run (HTTP {exc.code}); it will be skipped silently.")
+
+    def _active_providers(self) -> List[str]:
+        """Configured providers that are routed to and not (fully) disabled."""
+        active: List[str] = []
+        if "gemini" in self.keys and "gemini" not in self.disabled and any(
+            not self._is_disabled("gemini", m) for m in self.preferred_gemini_models
+        ):
+            active.append("gemini")
+        if "groq" in self.keys and "groq" not in self.disabled and any(
+            not self._is_disabled("groq", m) for m in self.groq_models
+        ):
+            active.append("groq")
+        if "openrouter" in self.keys and "openrouter" not in self.disabled:
+            active.append("openrouter")
+        return active
+
+    def all_providers_disabled(self) -> bool:
+        """True if providers are configured but every one has been disabled."""
+        return bool(self.keys) and not self._active_providers() and bool(self.disabled)
 
     def _load_keys(self) -> Dict[str, List[str]]:
         # Auto-load local .env if present
@@ -85,7 +132,8 @@ class AIRouter:
         gemini_keys = self.keys.get("gemini", [])
         if not gemini_keys:
             return None
-        key = gemini_keys[self.gemini_key_index % len(gemini_keys)]
+        live_keys = [k for k in gemini_keys if k not in self._dead_gemini_keys] or gemini_keys
+        key = live_keys[self.gemini_key_index % len(live_keys)]
         self.gemini_key_index += 1
         return key
 
@@ -108,14 +156,17 @@ class AIRouter:
 
         # Step 1: Try Gemini (fast failover with circuit breaker)
         now = time.time()
-        if now > self.gemini_cooldown_until:
+        gemini_dead = "gemini" in self.keys and "gemini" not in self._active_providers()
+        if gemini_dead:
+            pass
+        elif now > self.gemini_cooldown_until:
             gemini_keys = self.keys.get("gemini", [])
             gemini_attempts = 0
             for _ in range(min(2, len(gemini_keys) or 1)):
                 key = self._get_next_gemini_key()
                 if not key:
                     break
-                for model in models_to_try[:2]:
+                for model in [m for m in models_to_try if not self._is_disabled("gemini", m)][:2]:
                     gemini_attempts += 1
                     try:
                         result = self._call_gemini(prompt, model=model, key=key, schema=schema)
@@ -124,7 +175,10 @@ class AIRouter:
                             return result
                     except Exception as e:
                         errors.append(f"Gemini({model}) error: {str(e)}")
-                        logger.warning(f"Gemini {model} failed: {e}. Trying fallback...")
+                        if isinstance(e, urllib.error.HTTPError) and e.code in NON_RETRYABLE_STATUSES:
+                            self._disable_on_fatal_error("gemini", model, e, key=key)
+                        else:
+                            logger.warning(f"Gemini {model} failed: {e}. Trying fallback...")
                     if gemini_attempts >= 2:
                         break
                 if gemini_attempts >= 2:
@@ -137,9 +191,11 @@ class AIRouter:
             logger.info("Gemini currently in outage cooldown. Routing directly to Groq/OpenRouter.")
 
         # Step 2: Fallback to Groq
-        if "groq" in self.keys:
+        if "groq" in self.keys and "groq" not in self.disabled:
             groq_key = self.keys["groq"][0]
             for model in self.groq_models:
+                if self._is_disabled("groq", model) or "groq" in self.disabled:
+                    continue
                 try:
                     result = self._call_groq(prompt, model=model, key=groq_key)
                     if result:
@@ -147,10 +203,13 @@ class AIRouter:
                         return result
                 except Exception as e:
                     errors.append(f"Groq({model}) error: {str(e)}")
-                    logger.warning(f"Groq {model} failed: {e}")
+                    if isinstance(e, urllib.error.HTTPError) and e.code in NON_RETRYABLE_STATUSES:
+                        self._disable_on_fatal_error("groq", model, e)
+                    else:
+                        logger.warning(f"Groq {model} failed: {e}")
 
         # Step 3: Fallback to OpenRouter
-        if "openrouter" in self.keys:
+        if "openrouter" in self.keys and "openrouter" not in self.disabled:
             or_key = self.keys["openrouter"][0]
             try:
                 result = self._call_openrouter(prompt, key=or_key)
@@ -159,6 +218,7 @@ class AIRouter:
                     return result
             except Exception as e:
                 errors.append(f"OpenRouter error: {str(e)}")
+                self._disable_on_fatal_error("openrouter", None, e)
 
         raise RuntimeError(f"All AI Router providers failed. Errors: {'; '.join(errors)}")
 
@@ -258,7 +318,9 @@ def get_router_status() -> Dict[str, Any]:
         },
         "total_gemini_keys": len(router.keys.get("gemini", [])),
         "groq_active": "groq" in router.keys,
-        "primary_model": router.preferred_gemini_models[0]
+        "primary_model": router.preferred_gemini_models[0],
+        "disabled_providers": dict(getattr(router, "disabled", {})),
+        "all_disabled": bool(getattr(router, "all_providers_disabled", lambda: False)()),
     }
 
 def route_ai_evaluation(system_prompt: str, user_prompt: str, preferred_model: Optional[str] = None) -> Optional[Dict[str, Any]]:
