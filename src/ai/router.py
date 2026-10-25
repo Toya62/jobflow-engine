@@ -35,10 +35,11 @@ class AIRouter:
             "gemini-flash-latest"
         ]
         self.groq_models = [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant"
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
         ]
-        # Maps a provider ("groq") or provider/model ("groq/llama-3.1-8b-instant") to the reason it was disabled.
+        # Maps a provider ("groq") or provider/model ("groq/openai/gpt-oss-120b") to the reason it was disabled.
         self.disabled: Dict[str, str] = {}
         self._dead_gemini_keys: set = set()
 

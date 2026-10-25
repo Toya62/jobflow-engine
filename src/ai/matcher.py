@@ -549,8 +549,12 @@ def run_gemini_matcher_on_db(
         params.append(cutoff)
     q += ' ORDER BY j.id DESC'
 
-    df = pd.read_sql_query(q, conn, params=params if params else None)
+    cur = conn.cursor()
+    cur.execute(q, params if params else ())
+    cols = [d[0] for d in cur.description] if cur.description else []
+    rows = cur.fetchall()
     conn.close()
+    df = pd.DataFrame(rows, columns=cols)
 
     if df.empty:
         print("✓ All jobs in data/karriere.db are already evaluated. Nothing pending.")
