@@ -206,6 +206,9 @@ class AIRouter:
                     errors.append(f"Groq({model}) error: {str(e)}")
                     if isinstance(e, urllib.error.HTTPError) and e.code in NON_RETRYABLE_STATUSES:
                         self._disable_on_fatal_error("groq", model, e)
+                    elif isinstance(e, urllib.error.HTTPError) and e.code == 429:
+                        logger.warning(f"Groq {model} rate limited (HTTP 429). Pausing 2s before retry...")
+                        time.sleep(2.0)
                     else:
                         logger.warning(f"Groq {model} failed: {e}")
 
