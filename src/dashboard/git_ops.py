@@ -21,11 +21,24 @@ def git_root() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
+def reap_zombies() -> None:
+    """Reap reparented defunct child processes to prevent PID exhaustion."""
+    try:
+        while True:
+            pid, _ = os.waitpid(-1, os.WNOHANG)
+            if pid <= 0:
+                break
+    except (ChildProcessError, OSError):
+        pass
+
+
 def _ensure_git_safe() -> None:
     try:
         subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], capture_output=True)
     except Exception:
         pass
+    finally:
+        reap_zombies()
 
 
 def _git_dir(root_dir: str) -> str:
@@ -66,18 +79,21 @@ def safe_pull_rebase(root_dir: str) -> tuple[bool, str]:
     skipped unless the current branch is the repository default. A failed rebase
     is aborted so the working tree is always left clean.
     """
-    if git_in_progress(root_dir):
-        return False, "a git operation is already in progress; skipped"
-    branch = git_current_branch(root_dir)
-    if branch not in ("main", "master"):
-        return False, f"current branch is '{branch}', not 'main'; skipped to avoid rewriting unrelated history"
-    subprocess.run(["git", "fetch", "origin", "main"], cwd=root_dir, capture_output=True)
-    res = subprocess.run(["git", "pull", "--rebase", "--autostash", "origin", "main"],
-                         cwd=root_dir, capture_output=True, text=True)
-    if res.returncode != 0:
-        subprocess.run(["git", "rebase", "--abort"], cwd=root_dir, capture_output=True)
-        return False, (res.stderr or res.stdout or "pull --rebase failed").strip()
-    return True, "ok"
+    try:
+        if git_in_progress(root_dir):
+            return False, "a git operation is already in progress; skipped"
+        branch = git_current_branch(root_dir)
+        if branch not in ("main", "master"):
+            return False, f"current branch is '{branch}', not 'main'; skipped to avoid rewriting unrelated history"
+        subprocess.run(["git", "fetch", "origin", "main"], cwd=root_dir, capture_output=True)
+        res = subprocess.run(["git", "pull", "--rebase", "--autostash", "origin", "main"],
+                             cwd=root_dir, capture_output=True, text=True)
+        if res.returncode != 0:
+            subprocess.run(["git", "rebase", "--abort"], cwd=root_dir, capture_output=True)
+            return False, (res.stderr or res.stdout or "pull --rebase failed").strip()
+        return True, "ok"
+    finally:
+        reap_zombies()
 
 
 def git_sync(message: str) -> None:
@@ -101,6 +117,8 @@ def git_sync(message: str) -> None:
                 logger.warning(f"Git sync push returned code {res.returncode}: {res.stderr}")
         except Exception as e:
             logger.error(f"Git sync failed: {e}")
+        finally:
+            reap_zombies()
 
 
 def git_sync_async(message: str) -> None:

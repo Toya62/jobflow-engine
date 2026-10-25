@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from src.core.logger import get_logger
 from src.dashboard import state
-from src.dashboard.git_ops import git_root
+from src.dashboard.git_ops import git_root, reap_zombies
 from src.dashboard.schemas import ScraperRunRequest
 
 logger = get_logger(__name__)
@@ -81,6 +81,7 @@ def run_scraper(body: ScraperRunRequest):
         python_bin = venv_python if os.path.exists(venv_python) else sys.executable
         cmd = [python_bin, 'main.py', 'scrape', '--portal', portal, '--days', days]
 
+        reap_zombies()
         logger.info(f"Launching local scraper: {' '.join(cmd)}")
         log_path = os.path.join(root_dir, 'data', 'scraper_run.log')
         os.makedirs(os.path.dirname(log_path), exist_ok=True)

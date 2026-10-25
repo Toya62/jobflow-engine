@@ -1,5 +1,6 @@
 services:
   karriere:
+    init: true
     build: .
     image: ghcr.io/toya62/karriere-pipeline:latest
     container_name: karriere-dashboard

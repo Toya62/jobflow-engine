@@ -44,3 +44,15 @@ def test_safe_pull_skips_when_operation_in_progress(tmp_path):
 
     assert ok is False
     assert "in progress" in detail
+
+
+def test_reap_zombies_handles_no_children_gracefully():
+    from src.dashboard.git_ops import reap_zombies
+    reap_zombies()
+
+
+def test_reap_zombies_cleans_exited_children():
+    from src.dashboard.git_ops import reap_zombies
+    proc = subprocess.Popen(["echo", "ok"], stdout=subprocess.DEVNULL)
+    proc.wait()
+    reap_zombies()

@@ -31,6 +31,7 @@ from src.dashboard.git_ops import (
     git_current_branch,
     git_in_progress,
     git_root,
+    reap_zombies,
     safe_pull_rebase,
 )
 from src.dashboard.routers import ALL_ROUTERS
@@ -227,6 +228,8 @@ def _auto_pull_worker() -> None:
                         logger.warning(f"[Auto-Pull] {detail}")
         except Exception as e:
             logger.debug(f"Auto-pull background check error: {e}")
+        finally:
+            reap_zombies()
 
 
 @asynccontextmanager

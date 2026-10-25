@@ -16,6 +16,7 @@ ENV DASHBOARD_HOST=0.0.0.0
 
 # Install system dependencies, tectonic prerequisites, and fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tini \
     curl \
     git \
     libxml2-dev \
@@ -53,6 +54,9 @@ COPY --from=frontend /build/dashboard/app ./dashboard/app
 
 # Expose port for the dashboard
 EXPOSE 8000
+
+# Run under tini as init system to reap zombies and forward signals
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Run the dashboard by default
 CMD ["python", "main.py", "dashboard"]
