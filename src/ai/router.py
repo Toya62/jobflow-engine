@@ -35,8 +35,8 @@ class AIRouter:
             "gemini-flash-latest"
         ]
         self.groq_models = [
-            "openai/gpt-oss-120b",
             "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
             "qwen/qwen3.8-27b",
         ]
         # Maps a provider ("groq") or provider/model ("groq/openai/gpt-oss-120b") to the reason it was disabled.
