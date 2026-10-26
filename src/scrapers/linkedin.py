@@ -121,7 +121,7 @@ def fetch_single_job_details(job_url: str, session: requests.Session | None = No
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if resp.status_code != 200:
             return {}
-        
+        resp.encoding = "utf-8"
         text = resp.text
         # Applicant count
         app_num = None

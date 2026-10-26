@@ -47,6 +47,7 @@ def fetch_xing_job_detail(relative_or_full_url: str, max_days: int = 1) -> dict:
         resp = requests.get(clean_url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             return {}
+        resp.encoding = "utf-8"
 
         soup = BeautifulSoup(resp.text, "html.parser")
         ld_scripts = soup.find_all("script", type="application/ld+json")
@@ -135,6 +136,7 @@ def scrape_xing(queries: list[str] = None, max_pages: int = 4) -> pd.DataFrame:
                 resp = requests.get(url, headers=HEADERS, timeout=10)
                 if resp.status_code != 200:
                     break
+                resp.encoding = "utf-8"
                 soup = BeautifulSoup(resp.text, "html.parser")
                 found_on_page = 0
                 for a in soup.find_all("a", href=True):

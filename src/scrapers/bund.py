@@ -62,6 +62,7 @@ def fetch_bund_job_detail(url: str) -> dict:
         resp = requests.get(clean_url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             return {"job_url": clean_url, "description": ""}
+        resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # Find main content container
