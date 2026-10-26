@@ -254,11 +254,11 @@ def _call_gemini(prompt: str) -> dict:
     if not client:
         raise RuntimeError("Gemini API key not configured. Set GEMINI_API_KEY in .env")
 
-    # Try models in preference order (3.1-flash-lite is most reliable and healthy)
+    # Try models in preference order (3.5-flash-lite is most reliable and healthy)
     models_to_try = [
-        "gemini-3.1-flash-lite",
-        "gemini-3.6-flash",
         "gemini-3.5-flash-lite",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
         "gemini-3.8-flash",
     ]
 
