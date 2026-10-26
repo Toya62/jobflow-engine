@@ -25,10 +25,51 @@ router = APIRouter(prefix="/api", tags=["generation"])
 
 @router.get("/generate-application/status")
 def generation_status(task_key: str = Query("")):
-    """Poll the status of a background application-generation task."""
-    if not task_key:
-        return JSONResponse(status_code=400, content={"error": "Missing task_key parameter"})
-    return APP_GEN_STATUS.get(task_key, {"status": "not_found", "message": "No generation task found"})
+    """Poll the status of a background application-generation task, or all if task_key is empty."""
+    from src.dashboard.applications import get_generation_queue_stats, get_task_queue_position
+    if not task_key or task_key in ("all", "*"):
+        tasks = dict(APP_GEN_STATUS)
+        for k, v in list(tasks.items()):
+            if isinstance(v, dict) and v.get("status") == "queued":
+                live_pos = get_task_queue_position(k)
+                if live_pos is not None:
+                    tasks[k] = dict(v, queue_position=live_pos)
+        return {
+            "status": "ok",
+            "queue_stats": get_generation_queue_stats(),
+            "tasks": tasks
+        }
+
+    status = APP_GEN_STATUS.get(task_key)
+    if not status:
+        return {"status": "not_found", "message": "No generation task found"}
+
+    if isinstance(status, dict) and status.get("status") == "queued":
+        live_pos = get_task_queue_position(task_key)
+        if live_pos == 0:
+            status = dict(status, status="running", queue_position=0)
+        elif live_pos is not None:
+            status = dict(status, queue_position=live_pos)
+
+    return status
+
+
+@router.get("/generate-application/active")
+def get_active_generations():
+    """Return all currently queued, running, or recently completed generation tasks with live positions."""
+    from src.dashboard.applications import get_generation_queue_stats, get_task_queue_position
+    tasks = dict(APP_GEN_STATUS)
+    for k, v in list(tasks.items()):
+        if isinstance(v, dict) and v.get("status") == "queued":
+            live_pos = get_task_queue_position(k)
+            if live_pos == 0:
+                tasks[k] = dict(v, status="running", queue_position=0)
+            elif live_pos is not None:
+                tasks[k] = dict(v, queue_position=live_pos)
+    return {
+        "queue_stats": get_generation_queue_stats(),
+        "tasks": tasks
+    }
 
 
 @router.post("/generate-email")

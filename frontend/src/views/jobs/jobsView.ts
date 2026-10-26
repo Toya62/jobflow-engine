@@ -306,7 +306,11 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
             message: flat.message || "Generated successfully!",
           });
           notifyApplicationGenerated({
+            company: String(res.company || ""),
+            position: String(res.position || ""),
             taskKey,
+            cvPath: flat.cv_path,
+            coverPath: flat.cover_path,
           });
         } else if (res.status === "error") {
           clearInterval(pollInterval);
@@ -860,6 +864,63 @@ function paintModeButtons(): void {
         /* ignore tracker fetch failure */
       }
 
+      // Restore active, queued, or running generations across page reloads
+      try {
+        const activeData = await api.activeGenerations();
+        const activeTasks = activeData?.tasks || {};
+        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        for (const [tKey, task] of Object.entries<any>(activeTasks)) {
+          if (!task || !task.status) continue;
+          const tComp = norm(String(task.company || ""));
+          const tPos = norm(String(task.position || ""));
+          const tUrl = String(task.job_url || "").trim();
+          for (const job of allJobs) {
+            const key = jobKey(job);
+            if (jobGenStates.get(key)?.status === "ready") continue;
+            const jComp = norm(String(job.company || ""));
+            const jTitle = norm(String(job.title || ""));
+            const jUrl = String(job.job_url || "").trim();
+            const matchUrl = Boolean(tUrl && jUrl && tUrl === jUrl);
+            const matchText = Boolean(
+              tComp && jComp && (tComp === jComp || tComp.includes(jComp) || jComp.includes(tComp)) &&
+              tPos && jTitle && (tPos === jTitle || tPos.includes(jTitle) || jTitle.includes(tPos))
+            );
+            if (matchUrl || matchText) {
+              if (task.status === "queued") {
+                const pos = task.queue_position;
+                setJobGenState(key, {
+                  status: "queued",
+                  label: pos ? `Queued (#${pos})` : "Queued…",
+                  taskKey: tKey,
+                  message: task.message,
+                });
+                startJobPolling(key, tKey);
+              } else if (task.status === "running") {
+                setJobGenState(key, {
+                  status: "running",
+                  label: "Generating…",
+                  taskKey: tKey,
+                  message: task.message,
+                });
+                startJobPolling(key, tKey);
+              } else if (task.status === "complete") {
+                const flat = flattenResult(task);
+                setJobGenState(key, {
+                  status: "ready",
+                  label: "✓ Generated",
+                  taskKey: tKey,
+                  cvPath: flat.cv_path,
+                  coverPath: flat.cover_path,
+                  message: flat.message || "Generated successfully!",
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        /* ignore active generations fetch failure */
+      }
+
       paintBatchOptions();
       paint();
     } catch (error) {
@@ -896,24 +957,26 @@ function paintModeButtons(): void {
       unsubscribeGen();
       return;
     }
-    if (detail?.company && detail?.position) {
-      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const dComp = norm(detail.company);
-      const dTitle = norm(detail.position);
-      for (const job of allJobs) {
-        const jComp = norm(String(job.company || ""));
-        const jTitle = norm(String(job.title || ""));
-        if (
-          jComp && dComp && (jComp === dComp || jComp.includes(dComp) || dComp.includes(jComp)) &&
-          jTitle && dTitle && (jTitle === dTitle || jTitle.includes(dTitle) || dTitle.includes(jTitle))
-        ) {
-          const key = jobKey(job);
-          setJobGenState(key, {
-            status: "ready",
-            label: "✓ Generated",
-            message: "Application generated.",
-          });
-        }
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const dComp = detail?.company ? norm(detail.company) : "";
+    const dTitle = detail?.position ? norm(detail.position) : "";
+    const dTask = detail?.taskKey || "";
+    for (const job of allJobs) {
+      const key = jobKey(job);
+      const jComp = norm(String(job.company || ""));
+      const jTitle = norm(String(job.title || ""));
+      const matchComp = Boolean(dComp && jComp && (jComp === dComp || jComp.includes(dComp) || dComp.includes(jComp)));
+      const matchTitle = Boolean(dTitle && jTitle && (jTitle === dTitle || jTitle.includes(dTitle) || dTitle.includes(jTitle)));
+      const matchTask = Boolean(dTask && jobGenStates.get(key)?.taskKey === dTask);
+      if ((matchComp && matchTitle) || matchTask) {
+        setJobGenState(key, {
+          status: "ready",
+          label: "✓ Generated",
+          taskKey: dTask,
+          cvPath: detail?.cvPath,
+          coverPath: detail?.coverPath,
+          message: "Application generated.",
+        });
       }
     }
   });

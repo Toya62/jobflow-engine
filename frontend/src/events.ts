@@ -9,6 +9,8 @@ export interface ApplicationGeneratedDetail {
   company?: string;
   position?: string;
   taskKey?: string;
+  cvPath?: string;
+  coverPath?: string;
 }
 
 /** Emit event when an application generation completes. */

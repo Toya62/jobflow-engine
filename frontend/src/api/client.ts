@@ -80,7 +80,8 @@ export const api = {
   // Generation
   generateEmail: (body: GenerateEmailRequest) => request<GenerateEmailResponse>("/api/generate-email", {}, "POST", body),
   generateApplication: (body: GenerateApplicationRequest) => request<GenerateApplicationResponse>("/api/generate-application", {}, "POST", body),
-  generationStatus: (taskKey: string) => request<any>("/api/generate-application/status", { task_key: taskKey }),
+  generationStatus: (taskKey: string = "") => request<any>("/api/generate-application/status", taskKey ? { task_key: taskKey } : {}),
+  activeGenerations: () => request<any>("/api/generate-application/active"),
 
   // Scraper + sync (response shapes are untyped in OpenAPI; parse defensively)
   runScraper: (body: ScraperRunRequest) => request<unknown>("/api/run-scraper", {}, "POST", body),

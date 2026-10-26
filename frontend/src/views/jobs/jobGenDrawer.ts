@@ -129,12 +129,12 @@ export function createJobGenDrawer(): JobGenDrawer {
       <div class="kjc-gen-status hidden" data-gen-email-status></div>
     </div>`;
 
-  const renderGenerating = (taskKey: string): string => `
+  const renderGenerating = (taskKey: string, status?: string, queuePos?: number): string => `
     <div class="kjc-gen-generating">
       <div class="kjc-gen-spinner"></div>
-      <p>Generating ATS-tailored application…</p>
+      <p>${status === "queued" ? `Waiting in queue (position #${queuePos || 1})…` : "Generating ATS-tailored application…"}</p>
       <p class="kjc-gen-task-key">Task: ${escapeHtml(taskKey)}</p>
-      <div class="kjc-gen-progress" data-gen-progress></div>
+      <div class="kjc-gen-progress" data-gen-progress>${status === "queued" ? "Waiting for turn..." : ""}</div>
     </div>`;
 
   const renderEmailGenerating = (): string => `
@@ -158,8 +158,8 @@ export function createJobGenDrawer(): JobGenDrawer {
           </div>
         </div>`;
     }
-    if (result.status === "generating" || result.status === "running") {
-      return renderGenerating(result.task_key);
+    if (result.status === "generating" || result.status === "running" || result.status === "queued") {
+      return renderGenerating(result.task_key, result.status, result.queue_position);
     }
     return `<div class="kjc-gen-result error">Error: ${escapeHtml(result.message || "Unknown error")}</div>`;
   };

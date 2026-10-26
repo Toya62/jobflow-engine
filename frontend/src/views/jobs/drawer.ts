@@ -4,6 +4,7 @@ import type { JobRecord } from "../../api/types";
 import { ensureDescription } from "./description";
 import { jobDate } from "./filters";
 import { openEmailModal } from "../common/emailModal";
+import { onApplicationGenerated } from "../../events";
 
 const ESCAPE_MAP: Record<string, string> = {
   "&": "&amp;",
@@ -115,7 +116,32 @@ export function createDrawer(): Drawer {
         void copyDescription(text);
       });
 
+      let currentCvPath: string | undefined;
+
+      const unsubscribeGen = onApplicationGenerated((detail) => {
+        if (!element.isConnected || token !== openToken) {
+          unsubscribeGen();
+          return;
+        }
+        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const dComp = detail?.company ? norm(detail.company) : "";
+        const dTitle = detail?.position ? norm(detail.position) : "";
+        const jComp = norm(String(job.company || ""));
+        const jTitle = norm(String(job.title || ""));
+        const matchComp = Boolean(dComp && jComp && (jComp === dComp || jComp.includes(dComp) || dComp.includes(jComp)));
+        const matchTitle = Boolean(dTitle && jTitle && (jTitle === dTitle || jTitle.includes(dTitle) || dTitle.includes(jTitle)));
+        if (matchComp && matchTitle && generateBtn) {
+          currentCvPath = detail?.cvPath;
+          generateBtn.textContent = "✓ Open Generated CV ↗";
+          generateBtn.disabled = false;
+        }
+      });
+
       generateBtn?.addEventListener("click", () => {
+        if (currentCvPath) {
+          window.open(currentCvPath, "_blank");
+          return;
+        }
         const key = String(job.job_url || `${job.company ?? ""}|${job.title ?? ""}`);
         const directFn = (window as any).__triggerDirectGeneration;
         if (directFn) {

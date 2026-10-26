@@ -19,4 +19,14 @@ rsync -avzP \
   "${PROJECT_ROOT}/applications/" \
   "${REMOTE_HOST}:${REMOTE_PATH}/applications/"
 
+if [ -d "${PROJECT_ROOT}/dashboard/app" ]; then
+  echo "--> Pushing dashboard/app/..."
+  rsync -avzP \
+    "${PROJECT_ROOT}/dashboard/app/" \
+    "${REMOTE_HOST}:${REMOTE_PATH}/dashboard/app/"
+
+  echo "--> Updating container dashboard/app..."
+  ssh "${REMOTE_HOST}" "docker cp ${REMOTE_PATH}/dashboard/app karriere-dashboard:/app/dashboard/ 2>/dev/null || true"
+fi
+
 echo "=== Push completed successfully ==="

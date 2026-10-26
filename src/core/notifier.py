@@ -17,7 +17,9 @@ logger = get_logger(__name__)
 GERMAN_TZ = ZoneInfo("Europe/Berlin")
 
 # ── Auto-load local .env if present ──────────────────────────────────────────
-_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+from pathlib import Path
+_root_dir = Path(__file__).resolve().parent.parent.parent
+_env_path = os.path.join(_root_dir, ".env")
 if os.path.exists(_env_path):
     try:
         with open(_env_path, "r", encoding="utf-8") as _f:

@@ -150,6 +150,8 @@ def run_application_generation(company: str, position: str, description: str, jo
             "result": result,
             "company": company,
             "position": position,
+            "job_url": job_url,
+            "task_key": task_key,
             "completed_at": datetime.now().isoformat(),
         })
         if result.get("success"):
@@ -161,6 +163,8 @@ def run_application_generation(company: str, position: str, description: str, jo
             "message": str(gen_err),
             "company": company,
             "position": position,
+            "job_url": job_url,
+            "task_key": task_key,
             "completed_at": datetime.now().isoformat(),
         })
 
@@ -189,6 +193,8 @@ def _worker_loop() -> None:
                 "message": f"Analyzing ATS keywords & generating tailored application for {company}...",
                 "company": company,
                 "position": position,
+                "job_url": job_url,
+                "task_key": task_key,
                 "started_at": datetime.now().isoformat(),
             })
             run_application_generation(company, position, description, job_url, location, language, task_key)
@@ -220,6 +226,22 @@ def get_generation_queue_stats() -> dict:
     }
 
 
+def get_task_queue_position(task_key: str) -> int | None:
+    """Return live queue position: 0 if running now, 1..N if in queue, None otherwise."""
+    global _CURRENT_TASK_KEY
+    if _CURRENT_TASK_KEY == task_key:
+        return 0
+    with _WORKER_LOCK:
+        try:
+            items = list(_GEN_QUEUE.queue)
+            for idx, item in enumerate(items):
+                if len(item) >= 7 and item[6] == task_key:
+                    return idx + 1
+        except Exception:
+            pass
+    return None
+
+
 def launch_application_generation(company: str, position: str, description: str, job_url: str,
                                   location: str, language, task_key: str) -> dict:
     """Enqueue application generation onto the FIFO worker queue.
@@ -238,6 +260,8 @@ def launch_application_generation(company: str, position: str, description: str,
                 "message": f"Waiting in queue (position {q_pos + 1})...",
                 "company": company,
                 "position": position,
+                "job_url": job_url,
+                "task_key": task_key,
                 "queue_position": q_pos + 1,
                 "enqueued_at": datetime.now().isoformat(),
             })
@@ -247,6 +271,8 @@ def launch_application_generation(company: str, position: str, description: str,
                 "message": f"Analyzing ATS keywords & generating tailored application for {company}...",
                 "company": company,
                 "position": position,
+                "job_url": job_url,
+                "task_key": task_key,
                 "started_at": datetime.now().isoformat(),
             })
 
