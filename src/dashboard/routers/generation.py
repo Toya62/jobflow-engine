@@ -25,9 +25,10 @@ router = APIRouter(prefix="/api", tags=["generation"])
 
 @router.get("/generate-application/status")
 def generation_status(task_key: str = Query("")):
-    """Poll the status of a background application-generation task, or all if task_key is empty."""
+    if not task_key:
+        return JSONResponse(status_code=400, content={"error": "Missing task_key parameter"})
     from src.dashboard.applications import get_generation_queue_stats, get_task_queue_position
-    if not task_key or task_key in ("all", "*"):
+    if task_key in ("all", "*"):
         tasks = dict(APP_GEN_STATUS)
         for k, v in list(tasks.items()):
             if isinstance(v, dict) and v.get("status") == "queued":
