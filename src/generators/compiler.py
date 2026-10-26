@@ -176,8 +176,9 @@ def compile_all_applications(clean_tex: bool = True, push_git: bool = True, targ
             logger.error(f"  ❌ Compilation failed for {tex}: {res.stderr}")
             failed_tex.append(tex)
 
-    # Update and sync all .meta.json files
-    meta_files = glob.glob('applications/**/*.meta.json', recursive=True)
+    # Update and sync .meta.json files (scoped to target_date if provided)
+    meta_pattern = f'applications/{target_date}/**/*.meta.json' if target_date else 'applications/**/*.meta.json'
+    meta_files = glob.glob(meta_pattern, recursive=True)
     updated_meta_paths = []
     for meta_path in meta_files:
         try:
