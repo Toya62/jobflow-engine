@@ -97,13 +97,19 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
 
         if is_postgres() or os.path.exists(db_path):
             try:
+                from src.config import AUTO_MATCH_MAX_AGE_DAYS
+                from src.core.utils import GERMAN_TZ
                 conn = get_db_connection(db_path)
+                cutoff = (datetime.now(GERMAN_TZ) - timedelta(days=AUTO_MATCH_MAX_AGE_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
                 q_pending = f"""
                     SELECT COUNT(*) FROM jobs j
                     LEFT JOIN evaluations e ON j.id = e.job_id
                     WHERE e.id IS NULL AND length(j.description) > 30 {p_filter}
+                    AND j.scraped_at IS NOT NULL AND j.scraped_at != '' AND j.scraped_at >= ?
                 """
-                row = conn.cursor().execute(q_pending).fetchone()
+                cursor = conn.cursor()
+                cursor.execute(q_pending, (cutoff,))
+                row = cursor.fetchone()
                 pending_count = row[0] if row else 0
                 conn.close()
             except Exception as e:
@@ -118,13 +124,12 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             try:
                 from src.ai.matcher import run_gemini_matcher_on_db
                 from src.config import AUTO_MATCH_MAX_AGE_DAYS
-                # Prefer jobs added by this scrape; otherwise fall back to a recency window.
-                new_jobs_only = prev_max_id > 0
+                # Evaluate all pending jobs within recent window so no recent jobs are stranded
                 approved_jobs = run_gemini_matcher_on_db(
                     db_path=db_path,
                     portal=portal_name,
-                    min_job_id=prev_max_id + 1 if new_jobs_only else None,
-                    max_age_days=None if new_jobs_only else AUTO_MATCH_MAX_AGE_DAYS,
+                    min_job_id=None,
+                    max_age_days=AUTO_MATCH_MAX_AGE_DAYS,
                 )
                 approved_count = len(approved_jobs) if approved_jobs else 0
             except Exception as e:
@@ -230,18 +235,21 @@ def handle_match(args):
             output_dir=args.outdir,
             model_name=args.model,
             limit=args.limit,
-            rate_limit_delay=args.delay
+            rate_limit_delay=args.delay,
         )
     else:
         from src.ai.matcher import run_gemini_matcher_on_db
+        from src.config import AUTO_MATCH_MAX_AGE_DAYS
         db_path = os.path.join(args.outdir, "karriere.db") if hasattr(args, "outdir") else "data/karriere.db"
+        raw_age = getattr(args, "max_age_days", AUTO_MATCH_MAX_AGE_DAYS)
+        effective_age = None if (raw_age is not None and raw_age <= 0) else (raw_age or AUTO_MATCH_MAX_AGE_DAYS)
         run_gemini_matcher_on_db(
             model_name=args.model,
             limit=args.limit,
             rate_limit_delay=args.delay,
             db_path=db_path,
             portal=getattr(args, "portal", None),
-            max_age_days=getattr(args, "max_age_days", None),
+            max_age_days=effective_age,
         )
 
 
@@ -382,8 +390,8 @@ def main():
     match_parser.add_argument(
         "--max-age-days",
         type=int,
-        default=None,
-        help="Only evaluate jobs scraped within the last N days (default: all pending jobs)"
+        default=2,
+        help="Only evaluate jobs scraped within the last N days (default: 2; pass 0 for all historical jobs)"
     )
 
 # Dashboard parser

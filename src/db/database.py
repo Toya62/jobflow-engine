@@ -198,7 +198,7 @@ def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
 
-    if is_postgres():
+    if isinstance(conn, PgConnectionWrapper):
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS jobs (
             id SERIAL PRIMARY KEY,
@@ -381,7 +381,7 @@ def merge_databases(source_db_path: str, target_db_path: str | os.PathLike[str] 
     conn = setup_db(target_db_path)
     cursor = conn.cursor()
 
-    if is_postgres():
+    if isinstance(conn, PgConnectionWrapper):
         import sqlite3
         s_conn = sqlite3.connect(abs_source)
         s_cur = s_conn.cursor()

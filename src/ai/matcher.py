@@ -545,7 +545,7 @@ def run_gemini_matcher_on_db(
         # scraped_at is stored as 'YYYY-MM-DD HH:MM:SS' text on both SQLite and PostgreSQL,
         # so a string comparison against a Python-computed cutoff works on both ('?' is translated for PG).
         cutoff = (datetime.now(GERMAN_TZ) - timedelta(days=max_age_days)).strftime("%Y-%m-%d %H:%M:%S")
-        q += ' AND j.scraped_at >= ?'
+        q += ' AND j.scraped_at IS NOT NULL AND j.scraped_at != "" AND j.scraped_at >= ?'
         params.append(cutoff)
     q += ' ORDER BY j.id DESC'
 
@@ -556,15 +556,16 @@ def run_gemini_matcher_on_db(
     conn.close()
     df = pd.DataFrame(rows, columns=cols)
 
+    db_label = "PostgreSQL" if is_postgres() else "SQLite"
     if df.empty:
-        print("✓ All jobs in data/karriere.db are already evaluated. Nothing pending.")
+        print(f"✓ All recent jobs in {db_label} are already evaluated. Nothing pending.")
         return []
 
     if limit and limit > 0:
         df = df.head(limit)
 
     total_jobs = len(df)
-    logger.info(f"Starting AI matching on {total_jobs} pending jobs from SQLite using '{model_name}'...")
+    logger.info(f"Starting AI matching on {total_jobs} pending jobs from {db_label} using '{model_name}'...")
 
     client = get_gemini_client()
     configured_providers = get_router_status().get("providers", {})
