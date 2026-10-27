@@ -29,6 +29,7 @@ export async function mountScraperView(root: HTMLElement): Promise<void> {
           <input id="kjs-days" type="number" min="1" value="1" />
         </label>
         <button id="kjs-start" type="button" class="kjs-btn primary">Run scraper</button>
+        <button id="kjs-match" type="button" class="kjs-btn primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">⚡ Match with AI</button>
         <button id="kjs-stop" type="button" class="kjs-btn">Stop</button>
         <button id="kjs-sync" type="button" class="kjs-btn">Pull &amp; sync</button>
         <span class="kjs-state"><span id="kjs-dot" class="kjs-dot unknown"></span><span id="kjs-state">Checking…</span></span>
@@ -45,6 +46,7 @@ export async function mountScraperView(root: HTMLElement): Promise<void> {
   const portalInput = byId<HTMLInputElement>("kjs-portal");
   const daysInput = byId<HTMLInputElement>("kjs-days");
   const startButton = byId<HTMLButtonElement>("kjs-start");
+  const matchButton = byId<HTMLButtonElement>("kjs-match");
   const stopButton = byId<HTMLButtonElement>("kjs-stop");
   const syncButton = byId<HTMLButtonElement>("kjs-sync");
   const dot = byId<HTMLSpanElement>("kjs-dot");
@@ -70,6 +72,7 @@ export async function mountScraperView(root: HTMLElement): Promise<void> {
     stateLabel.textContent = label;
     dot.className = `kjs-dot ${running === true ? "running" : running === false ? "idle" : "unknown"}`;
     startButton.disabled = running === true;
+    matchButton.disabled = running === true;
     stopButton.disabled = running === false;
   };
 
@@ -107,6 +110,25 @@ export async function mountScraperView(root: HTMLElement): Promise<void> {
         days: Number.isFinite(days) && days >= 1 ? Math.floor(days) : 1,
       });
       setMessage(messageFrom(result, "Scraper started."));
+      running = true;
+      graceTicks = GRACE_TICKS;
+      await refreshLogs();
+    } catch (error) {
+      setMessage(describeError(error), true);
+    } finally {
+      paintState();
+    }
+  });
+
+  matchButton.addEventListener("click", async () => {
+    matchButton.disabled = true;
+    try {
+      const days = Number(daysInput.value);
+      const result = await api.runMatcher({
+        portal: portalInput.value.trim() || undefined,
+        max_age_days: Number.isFinite(days) && days >= 1 ? Math.floor(days) : 2,
+      });
+      setMessage(messageFrom(result, "AI Matcher started."));
       running = true;
       graceTicks = GRACE_TICKS;
       await refreshLogs();

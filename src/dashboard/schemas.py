@@ -62,6 +62,13 @@ class ScraperRunRequest(_LenientModel):
     days: int | str = 1
 
 
+class MatcherRunRequest(_LenientModel):
+    """Body for ``POST /api/run-matcher``."""
+
+    max_age_days: int = 2
+    portal: str | None = None
+
+
 class GenerateEmailRequest(_LenientModel):
     """Body for ``POST /api/generate-email``."""
 

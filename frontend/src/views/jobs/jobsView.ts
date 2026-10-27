@@ -138,6 +138,10 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
             <select id="kjc-batch"></select>
           </label>
           <span class="kjc-counts" id="kjc-counts">Showing 0 of 0 jobs</span>
+          <button id="kjc-match-btn" type="button" class="kjc-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-weight: 600; margin-left: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer;" title="Evaluate pending jobs with AI">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Match with AI <span id="kjc-pending-badge" style="background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 10px; font-size: 0.72rem; display: none;"></span>
+          </button>
         </div>
       </header>
       <div class="kjc-selection hidden" id="kjc-batchbar">
@@ -206,6 +210,8 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
   const copyButton = byId<HTMLButtonElement>("kjc-copy");
   const deselectButton = byId<HTMLButtonElement>("kjc-deselect");
   const counts = byId<HTMLSpanElement>("kjc-counts");
+  const matchBtn = byId<HTMLButtonElement>("kjc-match-btn");
+  const pendingBadge = byId<HTMLSpanElement>("kjc-pending-badge");
   const statusEl = byId<HTMLDivElement>("kjc-status");
   const gridHead = byId<HTMLDivElement>("kjc-grid-head");
   const viewport = byId<HTMLDivElement>("kjc-viewport");
@@ -983,4 +989,44 @@ function paintModeButtons(): void {
 
   syncUrl(state);
   await loadJobs();
+
+  async function checkPendingMatches(): Promise<void> {
+    try {
+      const data = await api.pendingMatches(2);
+      if (data && data.pending_count > 0) {
+        pendingBadge.textContent = String(data.pending_count);
+        pendingBadge.style.display = "inline-block";
+        matchBtn.title = `${data.pending_count} pending jobs need AI evaluation. Click to run AI Matcher.`;
+      } else {
+        pendingBadge.style.display = "none";
+        matchBtn.title = "All recent jobs evaluated. Click to re-run AI Matcher.";
+      }
+    } catch {
+      pendingBadge.style.display = "none";
+    }
+  }
+
+  matchBtn.addEventListener("click", async () => {
+    matchBtn.disabled = true;
+    matchBtn.style.opacity = "0.7";
+    const originalText = matchBtn.innerHTML;
+    matchBtn.innerHTML = `⚡ Matching...`;
+    statusEl.textContent = "⚡ AI Matcher launched! Switch to Scraper tab to view live progress.";
+    try {
+      await api.runMatcher({ max_age_days: 2 });
+      setTimeout(() => {
+        void checkPendingMatches();
+        matchBtn.disabled = false;
+        matchBtn.style.opacity = "1";
+        matchBtn.innerHTML = originalText;
+      }, 3000);
+    } catch (err) {
+      statusEl.textContent = `Failed to start matcher: ${err instanceof Error ? err.message : String(err)}`;
+      matchBtn.disabled = false;
+      matchBtn.style.opacity = "1";
+      matchBtn.innerHTML = originalText;
+    }
+  });
+
+  void checkPendingMatches();
 }

@@ -83,10 +83,15 @@ export const api = {
   generationStatus: (taskKey: string = "") => request<any>("/api/generate-application/status", taskKey ? { task_key: taskKey } : {}),
   activeGenerations: () => request<any>("/api/generate-application/active"),
 
-  // Scraper + sync (response shapes are untyped in OpenAPI; parse defensively)
+  // Scraper + sync + matcher (response shapes are untyped in OpenAPI; parse defensively)
   runScraper: (body: ScraperRunRequest) => request<unknown>("/api/run-scraper", {}, "POST", body),
   stopScraper: () => request<unknown>("/api/stop-scraper", {}, "POST"),
   scraperStatus: () => request<unknown>("/api/scraper-status"),
   scraperLogs: () => request<unknown>("/api/scraper-logs"),
+  runMatcher: (body?: { max_age_days?: number; portal?: string }) =>
+    request<{ success: boolean; message: string }>("/api/run-matcher", {}, "POST", body ?? {}),
+  pendingMatches: (max_age_days: number = 2) =>
+    request<{ pending_count: number; max_age_days: number }>("/api/pending-matches", { max_age_days }),
   sync: () => request<unknown>("/api/sync"),
 };
+
