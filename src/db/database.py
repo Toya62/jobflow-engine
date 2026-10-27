@@ -177,8 +177,12 @@ def get_db_connection(db_path: str | os.PathLike[str] = DB_PATH):
         if not HAS_PSYCOPG2:
             raise RuntimeError("psycopg2 is required when DATABASE_URL points to PostgreSQL.")
         pg_url = get_database_url()
-        conn = psycopg2.connect(pg_url)
-        return PgConnectionWrapper(conn)
+        try:
+            conn = psycopg2.connect(pg_url)
+            return PgConnectionWrapper(conn)
+        except Exception as e:
+            # Fall back to SQLite if PostgreSQL service is offline locally
+            pass
 
     db_path = os.fspath(db_path)
     parent_dir = os.path.dirname(db_path)
