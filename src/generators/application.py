@@ -108,8 +108,8 @@ def _select_template_archetype(title: str, description: str) -> str:
     """Select the best CV template archetype based on job content."""
     combined = f"{title} {description}".lower()
     scores = {}
-    for archetype, config in TEMPLATE_ARCHETYPES.items():
-        score = sum(1 for kw in config["keywords"] if kw in combined)
+    for archetype, arch_cfg in TEMPLATE_ARCHETYPES.items():
+        score = sum(1 for kw in arch_cfg["keywords"] if kw in combined)
         scores[archetype] = score
 
     best = max(scores, key=scores.get)

@@ -338,7 +338,7 @@ def _save_and_append_csv(new_records: list, file_path: str = None, sort_by_score
 def run_gemini_matcher(
     input_csv: str,
     output_dir: str = "data",
-    model_name: str = "gemini-3.1-flash-lite",
+    model_name: str = "gemini-3.5-flash-lite",
     limit: int | None = None,
     rate_limit_delay: float = 4.1
 ):
@@ -498,7 +498,7 @@ def run_auto_matching_on_latest(
 
 
 def run_gemini_matcher_on_db(
-    model_name: str = "gemini-3.1-flash-lite",
+    model_name: str = "gemini-3.5-flash-lite",
     limit: int | None = None,
     rate_limit_delay: float = 4.1,
     db_path: str = "data/karriere.db",
@@ -699,7 +699,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Directly evaluate any scraped CSV with a configured AI provider against the verified profile")
     parser.add_argument("--file", default="data/all_combined.csv", help="Input CSV path (e.g. data/linkedin_latest.csv, data/ba_latest.csv)")
     parser.add_argument("--outdir", default="data", help="Output directory (default: data)")
-    parser.add_argument("--model", default="gemini-3.1-flash-lite", help="Gemini model ID")
+    parser.add_argument("--model", default="gemini-3.5-flash-lite", help="Gemini model ID")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of jobs to evaluate (for testing)")
     parser.add_argument("--delay", type=float, default=4.1, help="Delay between API calls in seconds (default: 4.1 for 15 RPM)")
     parser.add_argument("--max-age-days", type=int, default=None, help="Only evaluate jobs scraped within the last N days from the SQLite DB (default: no limit; uses the CSV workflow if omitted)")

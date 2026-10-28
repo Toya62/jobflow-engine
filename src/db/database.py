@@ -180,7 +180,7 @@ def get_db_connection(db_path: str | os.PathLike[str] = DB_PATH):
         try:
             conn = psycopg2.connect(pg_url)
             return PgConnectionWrapper(conn)
-        except Exception as e:
+        except Exception:
             # Fall back to SQLite if PostgreSQL service is offline locally
             pass
 

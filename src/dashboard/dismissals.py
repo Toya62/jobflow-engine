@@ -51,7 +51,6 @@ def load_dismissed_df() -> pd.DataFrame:
 def add_to_dismissed(job_url: str = None, company: str = None, position: str = None) -> None:
     """Record a job as USER_DISMISSED in SQLite only."""
     from datetime import datetime
-    from src.db.database import setup_db
     try:
         db_path = os.path.join('data', 'karriere.db')
         conn = setup_db(db_path)

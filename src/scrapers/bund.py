@@ -208,8 +208,8 @@ def scrape_bund(queries: list[str] = None, max_results_per_query: int = 40) -> p
 def run_scrape_bund(window: str = None) -> pd.DataFrame:
     """Standard orchestrator runner for Bund.de."""
     from src.filters import (
-        filter_date, filter_seniority, filter_experience, filter_noise,
-        filter_cs_relevance, filter_research_cs, filter_forbidden_tech,
+        filter_date, filter_seniority, filter_noise,
+        filter_cs_relevance, filter_forbidden_tech,
         filter_language, filter_job_type, filter_seen_reposts, filter_seen_reposts_by_url
     )
     from src.db.database import save_jobs_to_db

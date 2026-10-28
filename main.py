@@ -99,6 +99,7 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             try:
                 from src.config import AUTO_MATCH_MAX_AGE_DAYS
                 from src.core.utils import GERMAN_TZ
+                from datetime import datetime, timedelta
                 conn = get_db_connection(db_path)
                 cutoff = (datetime.now(GERMAN_TZ) - timedelta(days=AUTO_MATCH_MAX_AGE_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
                 q_pending = f"""
@@ -368,6 +369,20 @@ def handle_scrape(args):
         with open("data/latest_run_summary.json", "w", encoding="utf-8") as f:
             json.dump(summary_data, f, indent=2)
         print(f"✓ Run summary written to data/latest_run_summary.json: {total_run_approved} approved, {total_run_scraped} scraped")
+        
+        # Dispatch structured Telegram notification for completed batch
+        try:
+            from src.core.notifier import notify_scrape_summary
+            notify_scrape_summary(
+                new_jobs_count=total_run_scraped,
+                approved_count=total_run_approved,
+                portal=portal,
+                run_approved_count=total_run_approved,
+                run_new_count=total_run_scraped,
+                portal_breakdown=portal_breakdown,
+            )
+        except Exception as notify_err:
+            print(f"[Warning] Telegram summary dispatch error: {notify_err}")
     except Exception as e:
         print(f"Warning: could not save latest_run_summary.json: {e}")
 
