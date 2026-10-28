@@ -63,7 +63,7 @@ export function openEmailModal(job: EmailModalJob): void {
       border-radius: 12px;
       box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
       overflow: hidden;
-      animation: kjcModalIn 0.15s ease-out;
+      animation: kjcModalIn var(--duration-slow) var(--ease-spring);
     ">
       <div style="
         display: flex;

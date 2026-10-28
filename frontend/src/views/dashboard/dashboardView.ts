@@ -85,25 +85,25 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
     <div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
       <!-- 4 Top-line KPI Cards -->
       <div class="kjc-dash-kpis">
-        <div class="kjc-kpi-card">
+        <div class="kjc-kpi-card kjc-animate-fade-in-up" style="animation-delay: 0ms;">
           <div class="kjc-kpi-label">Harvested Jobs</div>
           <div class="kjc-kpi-value">${counts.total_jobs.toLocaleString()}</div>
           <div class="kjc-kpi-sub">Across 7 career portals</div>
         </div>
 
-        <div class="kjc-kpi-card">
+        <div class="kjc-kpi-card kjc-animate-fade-in-up" style="animation-delay: 60ms;">
           <div class="kjc-kpi-label">AI Evaluated</div>
           <div class="kjc-kpi-value">${counts.total_evaluated.toLocaleString()}</div>
           <div class="kjc-kpi-sub">${counts.total_approved.toLocaleString()} Approved (${Math.round((counts.total_approved / Math.max(1, counts.total_evaluated)) * 100)}% Pass Rate)</div>
         </div>
 
-        <div class="kjc-kpi-card" style="border-left: 3px solid var(--accent-warning);">
+        <div class="kjc-kpi-card kjc-animate-fade-in-up" style="animation-delay: 120ms; border-left: 3px solid var(--accent-warning);">
           <div class="kjc-kpi-label">Ready to Submit</div>
           <div class="kjc-kpi-value" style="color: var(--accent-warning);">${counts.ready_to_submit_count}</div>
           <div class="kjc-kpi-sub">CV &amp; Cover Letter PDFs compiled</div>
         </div>
 
-        <div class="kjc-kpi-card" style="border-left: 3px solid var(--accent-success);">
+        <div class="kjc-kpi-card kjc-animate-fade-in-up" style="animation-delay: 180ms; border-left: 3px solid var(--accent-success);">
           <div class="kjc-kpi-label">Applied (CRM)</div>
           <div class="kjc-kpi-value" style="color: var(--accent-success);">${counts.total_applied.toLocaleString()}</div>
           <div class="kjc-kpi-sub">Active tracked applications</div>
@@ -112,21 +112,21 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
 
       <!-- Quick-links to Apply Queue -->
       <div class="kjc-dash-quicklinks">
-        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-submit" data-nav="jobs">
+        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-submit kjc-animate-fade-in-up" style="animation-delay: 240ms;" data-nav="jobs">
           <div class="kjc-dash-ql-icon">📤</div>
           <div>
             <div class="kjc-dash-ql-num">${counts.ready_to_submit_count}</div>
             <div class="kjc-dash-ql-label">Ready to Submit</div>
           </div>
         </button>
-        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-generate" data-nav="jobs">
+        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-generate kjc-animate-fade-in-up" style="animation-delay: 300ms;" data-nav="jobs">
           <div class="kjc-dash-ql-icon">⚡</div>
           <div>
             <div class="kjc-dash-ql-num">${counts.uncompiled_approved_count || readyToGenerate.length}</div>
             <div class="kjc-dash-ql-label">Approved — Generate CV</div>
           </div>
         </button>
-        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-crm" data-nav="crm">
+        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-crm kjc-animate-fade-in-up" style="animation-delay: 360ms;" data-nav="crm">
           <div class="kjc-dash-ql-icon">📋</div>
           <div>
             <div class="kjc-dash-ql-num">${counts.total_applied.toLocaleString()}</div>
@@ -138,7 +138,7 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
       <!-- Pipeline Engine Pulse Grid (3 Columns) -->
       <div class="kjc-engine-grid">
         <!-- Card 1: Portal Harvest Distribution -->
-        <div class="kjc-engine-card">
+        <div class="kjc-engine-card kjc-animate-fade-in-up" style="animation-delay: 420ms;">
           <div class="kjc-engine-card-header">
             <span class="kjc-engine-card-title">Portal Harvest Breakdown</span>
             <span style="font-size:0.75rem;color:var(--text-muted);">${counts.total_jobs.toLocaleString()} jobs</span>
@@ -164,7 +164,7 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
         </div>
 
         <!-- Card 2: AI Rejection Analytics -->
-        <div class="kjc-engine-card">
+        <div class="kjc-engine-card kjc-animate-fade-in-up" style="animation-delay: 480ms;">
           <div class="kjc-engine-card-header">
             <span class="kjc-engine-card-title">AI Qualification Filters</span>
             <span style="font-size:0.75rem;color:var(--text-muted);">Profile Match Guardrails</span>
@@ -191,7 +191,7 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
         </div>
 
         <!-- Card 3: Target Archetype Breakdown -->
-        <div class="kjc-engine-card">
+        <div class="kjc-engine-card kjc-animate-fade-in-up" style="animation-delay: 540ms;">
           <div class="kjc-engine-card-header">
             <span class="kjc-engine-card-title">Approved Match Archetypes</span>
             <span style="font-size:0.75rem;color:var(--text-muted);">${counts.total_approved.toLocaleString()} approved</span>

@@ -167,7 +167,7 @@ if (!root) throw new Error("Root element #app not found");
 
     // Fade-in after mount
     requestAnimationFrame(() => {
-      viewContainer.style.transition = "opacity 0.22s ease, transform 0.22s ease";
+      viewContainer.style.transition = "opacity var(--duration-slow) var(--ease-spring), transform var(--duration-slow) var(--ease-spring)";
       viewContainer.style.opacity = "1";
       viewContainer.style.transform = "translateY(0)";
     });
