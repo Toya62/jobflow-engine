@@ -5,7 +5,18 @@
  * by `npm run gen:api`), so backend contract changes surface as TypeScript errors.
  */
 
-import type { ApprovedIndexEntry, JobDescriptions, JobRecord, TrackerRecord, GenerateApplicationRequest, GenerateApplicationResponse, GenerateEmailRequest, GenerateEmailResponse } from "./types";
+import type {
+  ApprovedIndexEntry,
+  CandidateProfileResponse,
+  FunnelStatsResponse,
+  GenerateApplicationRequest,
+  GenerateApplicationResponse,
+  GenerateEmailRequest,
+  GenerateEmailResponse,
+  JobDescriptions,
+  JobRecord,
+  TrackerRecord,
+} from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -95,6 +106,8 @@ export const api = {
   matcherLogs: () => request<unknown>("/api/matcher-logs"),
   pendingMatches: (max_age_days: number = 2) =>
     request<{ pending_count: number; max_age_days: number }>("/api/pending-matches", { max_age_days }),
+  funnelStats: () => request<FunnelStatsResponse>("/api/funnel-stats"),
+  candidateProfile: () => request<CandidateProfileResponse>("/api/profile"),
   sync: () => request<unknown>("/api/sync"),
 };
 

@@ -2,17 +2,20 @@ import "./app.css";
 
 import { parseState } from "./urlState";
 
-type ViewMode = "jobs" | "crm" | "scraper";
+type ViewMode = "dashboard" | "jobs" | "crm" | "profile" | "scraper";
 
 function getViewFromUrl(): ViewMode {
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
-  return view === "crm" || view === "scraper" ? view : "jobs";
+  if (view === "jobs" || view === "crm" || view === "profile" || view === "scraper") {
+    return view;
+  }
+  return "dashboard";
 }
 
 function setViewInUrl(view: ViewMode, push = true): void {
   const params = new URLSearchParams(window.location.search);
-  if (view === "jobs") {
+  if (view === "dashboard") {
     params.delete("view");
   } else {
     params.set("view", view);
@@ -44,21 +47,29 @@ if (!root) throw new Error("Root element #app not found");
           </svg>
           <div>
             <div style="font-family:var(--font-display);font-size:1.3rem;font-weight:600;letter-spacing:-0.015em;">Karriere Pipeline</div>
-            <div class="kjc-brand-sub">Job Intelligence</div>
+            <div class="kjc-brand-sub">Job Intelligence & Dossier Platform</div>
           </div>
         </div>
         <nav class="kjc-tab-bar" role="tablist" aria-label="Main views">
+          <button type="button" role="tab" class="kjc-tab" data-view="dashboard" aria-selected="false" aria-controls="dashboard-panel" id="tab-dashboard">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+            <span class="kjc-tab-label">Dashboard</span>
+          </button>
           <button type="button" role="tab" class="kjc-tab" data-view="jobs" aria-selected="false" aria-controls="jobs-panel" id="tab-jobs">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
             <span class="kjc-tab-label">Job Finder</span>
           </button>
           <button type="button" role="tab" class="kjc-tab" data-view="crm" aria-selected="false" aria-controls="crm-panel" id="tab-crm">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            <span class="kjc-tab-label">CRM Tracker</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14H6v-6h4v6zm5 0h-4v-8h4v8zm4 0h-3v-4h3v4z"/></svg>
+            <span class="kjc-tab-label">CRM Applications</span>
+          </button>
+          <button type="button" role="tab" class="kjc-tab" data-view="profile" aria-selected="false" aria-controls="profile-panel" id="tab-profile">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            <span class="kjc-tab-label">Candidate Profile</span>
           </button>
           <button type="button" role="tab" class="kjc-tab" data-view="scraper" aria-selected="false" aria-controls="scraper-panel" id="tab-scraper">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <span class="kjc-tab-label">Scraper</span>
+            <span class="kjc-tab-label">Scraper & AI</span>
           </button>
           <span class="kjc-tab-indicator" aria-hidden="true"></span>
         </nav>
@@ -93,7 +104,11 @@ if (!root) throw new Error("Root element #app not found");
   const mountView = async (view: ViewMode): Promise<void> => {
     setActiveTab(view);
 
-    if (view === "crm") {
+    if (view === "dashboard") {
+      await import("./views/dashboard/dashboardView").then(({ mountDashboardView }) =>
+        mountDashboardView(viewContainer)
+      );
+    } else if (view === "crm") {
       const urlParams = new URLSearchParams(window.location.search);
       await import("./views/crm/crmView").then(({ mountCrmView }) =>
         mountCrmView(viewContainer, {
@@ -105,6 +120,10 @@ if (!root) throw new Error("Root element #app not found");
           dir: (urlParams.get("dir") as "asc" | "desc") || "desc",
           dataset: ""
         })
+      );
+    } else if (view === "profile") {
+      await import("./views/profile/profileView").then(({ mountProfileView }) =>
+        mountProfileView(viewContainer)
       );
     } else if (view === "scraper") {
       await import("./views/scraper/scraperView").then(({ mountScraperView }) =>

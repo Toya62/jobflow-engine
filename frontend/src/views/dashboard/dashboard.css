@@ -1,0 +1,346 @@
+/* Dashboard view — Dossier-inspired executive analytics & funnel */
+
+.kjc-dash-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 1.5rem 2rem 3rem;
+  max-width: 1350px;
+  margin: 0 auto;
+}
+
+.kjc-dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1.25rem;
+}
+
+.kjc-dash-greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kjc-dash-title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.kjc-dash-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.kjc-dash-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: rgba(91, 139, 239, 0.08);
+  border: 1px solid rgba(91, 139, 239, 0.22);
+  font-size: 0.82rem;
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+
+/* ═══════════ KPI Grid ═══════════ */
+.kjc-dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.kjc-kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.kjc-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+.kjc-kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+}
+
+.kjc-kpi-card.blue::before { background: var(--accent-primary); }
+.kjc-kpi-card.brass::before { background: var(--accent-brass); }
+.kjc-kpi-card.purple::before { background: var(--accent-purple); }
+.kjc-kpi-card.green::before { background: var(--accent-success); }
+
+.kjc-kpi-label {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.kjc-kpi-value {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.kjc-kpi-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ═══════════ Funnel Section ═══════════ */
+.kjc-dash-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.kjc-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kjc-section-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kjc-funnel-stages {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .kjc-funnel-stages {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kjc-funnel-node {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.kjc-funnel-node.stage-draft { border-left: 4px solid var(--text-muted); }
+.kjc-funnel-node.stage-applied { border-left: 4px solid var(--accent-primary); }
+.kjc-funnel-node.stage-interview { border-left: 4px solid var(--accent-purple); }
+.kjc-funnel-node.stage-offer { border-left: 4px solid var(--accent-brass); }
+.kjc-funnel-node.stage-rejected { border-left: 4px solid var(--accent-danger); }
+
+.kjc-node-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+
+.kjc-node-count {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.kjc-node-conversion {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ═══════════ Two Column Split ═══════════ */
+.kjc-dash-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1050px) {
+  .kjc-dash-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════ Recommended Jobs ═══════════ */
+.kjc-rec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.kjc-rec-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kjc-rec-card:hover {
+  border-color: rgba(91, 139, 239, 0.4);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.kjc-rec-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.kjc-rec-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.kjc-rec-company {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.kjc-rec-role {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kjc-rec-tags {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.2rem;
+}
+
+.kjc-rec-tag {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.kjc-rec-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.kjc-score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-pill);
+  background: rgba(56, 211, 154, 0.14);
+  border: 1px solid rgba(56, 211, 154, 0.35);
+  color: var(--accent-success);
+}
+
+.kjc-btn-sm {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--accent-primary);
+  background: var(--accent-primary);
+  color: #090b10;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.kjc-btn-sm:hover {
+  background: var(--accent-primary-hover);
+}
+
+/* ═══════════ Activity Bars ═══════════ */
+.kjc-activity-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  height: 160px;
+  padding-top: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.kjc-activity-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.kjc-bar-stack {
+  width: 100%;
+  max-width: 38px;
+  background: rgba(91, 139, 239, 0.25);
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
+  transition: height 0.3s ease;
+}
+
+.kjc-bar-applied {
+  background: var(--accent-primary);
+  border-radius: 4px 4px 0 0;
+  width: 100%;
+}
+
+.kjc-bar-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

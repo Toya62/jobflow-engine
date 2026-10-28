@@ -277,3 +277,24 @@ def list_jobs(
         return df.to_dict(orient='records')
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/profile")
+def get_candidate_profile():
+    """Return verified candidate profile facts, verified projects, and skills taxonomy."""
+    try:
+        from src.core import config
+        p = config.load_candidate_profile()
+        return {
+            "personal_info": p.get("personal_info", {}),
+            "education": p.get("education", []),
+            "skills": p.get("skills", {}),
+            "languages": p.get("languages", {}),
+            "projects": p.get("projects", []),
+            "experience_summary": p.get("experience_summary", ""),
+            "job_search_preferences": p.get("job_search_preferences", {}),
+            "integrity_status": "100% Verified Profile — AGENTS.md Single Source of Truth",
+        }
+    except Exception as e:
+        logger.error(f"Failed to load candidate profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

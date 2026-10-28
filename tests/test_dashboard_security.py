@@ -377,3 +377,28 @@ def test_scraper_and_matcher_concurrency(dashboard, monkeypatch):
     finally:
         state.SCRAPER_PROCESS = None
         state.MATCHER_PROCESS = None
+
+
+def test_funnel_stats_endpoint(dashboard):
+    res = dashboard.get("/api/funnel-stats")
+    assert res.status_code == 200
+    data = res.json()
+    assert "stages" in data
+    assert "conversions" in data
+    assert "weekly_activity" in data
+    assert "top_recommendations" in data
+    assert "draft" in data["stages"]
+    assert "applied" in data["stages"]
+
+
+def test_profile_endpoint(dashboard):
+    res = dashboard.get("/api/profile")
+    assert res.status_code == 200
+    data = res.json()
+    assert "personal_info" in data
+    assert "education" in data
+    assert "skills" in data
+    assert "projects" in data
+    assert "integrity_status" in data
+
+

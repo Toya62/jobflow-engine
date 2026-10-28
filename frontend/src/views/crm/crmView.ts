@@ -86,6 +86,10 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
       <header class="kjc-header">
         <div class="kjc-brand"><span>CRM Tracker</span></div>
         <div class="kjc-toolbar">
+          <div class="kjc-view-toggle">
+            <button type="button" class="kjc-toggle-btn active" id="kjc-toggle-table">Table View</button>
+            <button type="button" class="kjc-toggle-btn" id="kjc-toggle-board">Kanban Board</button>
+          </div>
           <span class="kjc-counts" id="kjc-counts">Showing 0 of 0 applications</span>
         </div>
       </header>
@@ -106,13 +110,14 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
         <button id="kjc-deselect" type="button" class="kjc-btn">Deselect All</button>
       </div>
       <div class="kjc-status" id="kjc-status"></div>
-      <div class="kjc-grid" role="table" aria-label="CRM Applications">
+      <div class="kjc-grid" id="kjc-grid" role="table" aria-label="CRM Applications">
         <div class="kjc-grid-head" id="kjc-grid-head" role="row"></div>
         <div class="kjc-viewport" id="kjc-viewport" role="rowgroup">
           <div class="kjc-spacer" id="kjc-spacer"></div>
           <div class="kjc-rows" id="kjc-rows"></div>
         </div>
       </div>
+      <div class="kjc-board hidden" id="kjc-board"></div>
     </div>`;
 
   const byId = <T extends HTMLElement>(id: string): T => {
@@ -120,6 +125,11 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
     if (!node) throw new Error(`Missing element #${id}`);
     return node;
   };
+
+  const toggleTableBtn = byId<HTMLButtonElement>("kjc-toggle-table");
+  const toggleBoardBtn = byId<HTMLButtonElement>("kjc-toggle-board");
+  const gridEl = byId<HTMLDivElement>("kjc-grid");
+  const boardEl = byId<HTMLDivElement>("kjc-board");
 
   const qInput = byId<HTMLInputElement>("kjc-q");
   const locInput = byId<HTMLInputElement>("kjc-loc");
@@ -479,6 +489,122 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
     });
   }
 
+  let viewMode: "table" | "board" = "table";
+
+  toggleTableBtn.addEventListener("click", () => {
+    viewMode = "table";
+    toggleTableBtn.classList.add("active");
+    toggleBoardBtn.classList.remove("active");
+    gridEl.classList.remove("hidden");
+    boardEl.classList.add("hidden");
+    paint();
+  });
+
+  toggleBoardBtn.addEventListener("click", () => {
+    viewMode = "board";
+    toggleBoardBtn.classList.add("active");
+    toggleTableBtn.classList.remove("active");
+    gridEl.classList.add("hidden");
+    boardEl.classList.remove("hidden");
+    renderBoard();
+  });
+
+  function renderBoard(): void {
+    if (viewMode !== "board") return;
+    boardEl.innerHTML = "";
+
+    const cols = [
+      { id: "prepared", title: "📝 Prepared", statuses: ["prepared", "draft", "not applied", ""] },
+      { id: "applied", title: "📤 Applied", statuses: ["applied", "sent"] },
+      { id: "interview", title: "💬 Interview", statuses: ["interview", "interviewed", "screening", "assessment"] },
+      { id: "offer", title: "🏆 Offer", statuses: ["offer", "accepted"] },
+      { id: "rejected", title: "❌ Rejected", statuses: ["rejected", "declined", "ghosted"] },
+    ];
+
+    cols.forEach((col) => {
+      const colEl = element("div", "kjc-kanban-col");
+      const colHead = element("div", "kjc-kanban-col-head");
+      const matched = currentRecords.filter((r) => {
+        const s = statusKey(r.status);
+        return col.statuses.includes(s) || (col.id === "prepared" && !r.status);
+      });
+
+      colHead.innerHTML = `
+        <span class="kjc-kanban-col-title">${col.title}</span>
+        <span class="kjc-kanban-count">${matched.length}</span>
+      `;
+      colEl.appendChild(colHead);
+
+      const cardsContainer = element("div", "kjc-kanban-cards");
+      matched.forEach((rec) => {
+        const card = element("div", "kjc-kanban-card");
+        const dateStr = rec.date_applied ? rec.date_applied.slice(0, 10) : "";
+        card.innerHTML = `
+          <div class="kjc-card-company">${escapeHtml(rec.company)}</div>
+          <div class="kjc-card-role">${escapeHtml(rec.position)}</div>
+          <div class="kjc-card-meta">
+            <span>📍 ${escapeHtml(rec.location || "Germany")}</span>
+            <span>${escapeHtml(dateStr)}</span>
+          </div>
+          ${rec.notes ? `<div class="kjc-card-notes">${escapeHtml(rec.notes)}</div>` : ""}
+          <div class="kjc-card-footer">
+            <div class="kjc-card-links">
+              ${rec.cv_pdf_path ? `<a href="${rec.cv_pdf_path}" target="_blank" rel="noopener" class="kjc-card-pill">📄 CV</a>` : ""}
+              ${rec.cover_pdf_path ? `<a href="${rec.cover_pdf_path}" target="_blank" rel="noopener" class="kjc-card-pill">✉️ Cover</a>` : ""}
+            </div>
+            <select class="kjc-card-status-select">
+              ${STATUS_OPTIONS.map(
+                (opt) => `<option value="${opt}" ${statusKey(rec.status) === opt.toLowerCase() ? "selected" : ""}>${opt}</option>`
+              ).join("")}
+            </select>
+          </div>
+        `;
+
+        card.addEventListener("click", (e) => {
+          if ((e.target as HTMLElement).tagName === "SELECT" || (e.target as HTMLElement).tagName === "A") return;
+          drawer.open(rec);
+        });
+
+        const selectEl = card.querySelector<HTMLSelectElement>(".kjc-card-status-select");
+        if (selectEl) {
+          selectEl.addEventListener("change", async (ev) => {
+            ev.stopPropagation();
+            const newStatus = selectEl.value;
+            try {
+              await api.updateApplication({
+                job_url: rec.job_url,
+                company: rec.company,
+                position: rec.position,
+                status: newStatus,
+              });
+              rec.status = newStatus;
+              statusEl.textContent = `Updated ${rec.company} to ${newStatus}.`;
+              paint(true);
+            } catch (err) {
+              alert(`Failed to update status: ${String(err)}`);
+            }
+          });
+        }
+
+        cardsContainer.appendChild(card);
+      });
+
+      colEl.appendChild(cardsContainer);
+      boardEl.appendChild(colEl);
+    });
+  }
+
+  function escapeHtml(text: string): string {
+    const map: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    };
+    return String(text || "").replace(/[&<>"']/g, (m) => map[m]);
+  }
+
   function paint(keepScroll = false): void {
     let filtered = filterRecords(allRecords, state);
     if (statusFilter !== "all") {
@@ -486,8 +612,12 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
     }
     currentRecords = sortRecords(filtered, state.sort, state.dir);
     counts.textContent = `Showing ${currentRecords.length} of ${allRecords.length} applications`;
-    if (!keepScroll) viewport.scrollTop = 0;
-    applyWindow();
+    if (!keepScroll && viewMode === "table") viewport.scrollTop = 0;
+    if (viewMode === "table") {
+      applyWindow();
+    } else {
+      renderBoard();
+    }
     updateSelectionUI();
   }
 

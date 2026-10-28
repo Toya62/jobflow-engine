@@ -244,3 +244,103 @@ def delete_application(payload: ApplicationDeleteRequest | None = None, keep_job
     except Exception as e:
         logger.error(f"Delete application error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/funnel-stats")
+def get_funnel_stats():
+    """Return application funnel metrics, weekly breakdown, and top recommended jobs."""
+    try:
+        from collections import defaultdict
+        from datetime import datetime
+        df = load_tracker_df()
+        stages = {
+            "draft": 0,
+            "applied": 0,
+            "screening": 0,
+            "interview": 0,
+            "offer": 0,
+            "rejected": 0,
+            "total": 0,
+        }
+        if not df.empty:
+            stages["total"] = len(df)
+            for _, r in df.iterrows():
+                st = str(r.get("status", "")).strip().lower()
+                if st in ("prepared", "draft", "not applied"):
+                    stages["draft"] += 1
+                elif st in ("applied", "sent"):
+                    stages["applied"] += 1
+                elif st in ("screening", "assessment"):
+                    stages["screening"] += 1
+                elif st in ("interview", "technical interview"):
+                    stages["interview"] += 1
+                elif st in ("offer", "accepted"):
+                    stages["offer"] += 1
+                elif st in ("rejected", "declined", "user_dismissed", "ghosted"):
+                    stages["rejected"] += 1
+                else:
+                    stages["draft"] += 1
+
+        active_funnel = stages["applied"] + stages["screening"] + stages["interview"] + stages["offer"] + stages["rejected"]
+        applied_to_interview = round(((stages["interview"] + stages["offer"]) / max(1, active_funnel)) * 100, 1)
+        interview_to_offer = round((stages["offer"] / max(1, stages["interview"] + stages["offer"])) * 100, 1)
+
+        weekly = defaultdict(lambda: {"applied": 0, "prepared": 0})
+        if not df.empty:
+            for _, r in df.iterrows():
+                dt_str = str(r.get("date_applied") or r.get("applied_at") or "").strip()
+                if dt_str and len(dt_str) >= 10:
+                    try:
+                        d = datetime.strptime(dt_str[:10], "%Y-%m-%d")
+                        w_key = f"W{d.isocalendar()[1]} ({d.strftime('%b')})"
+                        st = str(r.get("status", "")).strip().lower()
+                        if st in ("applied", "sent", "interview", "offer"):
+                            weekly[w_key]["applied"] += 1
+                        else:
+                            weekly[w_key]["prepared"] += 1
+                    except Exception:
+                        pass
+
+        top_recommendations = []
+        try:
+            conn = get_db_connection(DB_PATH)
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT j.id, j.company, j.title, j.url, j.location, e.score, e.archetype, e.matched_skills, e.gaps, j.scraped_at
+                FROM jobs j
+                JOIN evaluations e ON j.id = e.job_id
+                LEFT JOIN applications a ON j.id = a.job_id
+                WHERE a.id IS NULL AND e.status = 'APPROVED' AND e.score >= 70
+                ORDER BY e.score DESC, j.id DESC
+                LIMIT 5
+            """)
+            rows = cur.fetchall()
+            for row in rows:
+                top_recommendations.append({
+                    "id": row[0],
+                    "company": row[1],
+                    "title": row[2],
+                    "url": row[3],
+                    "location": row[4],
+                    "score": row[5],
+                    "archetype": row[6],
+                    "matched_skills": row[7],
+                    "gaps": row[8],
+                    "scraped_at": row[9],
+                })
+            conn.close()
+        except Exception as e_top:
+            logger.warning(f"Failed fetching top recommendations: {e_top}")
+
+        return {
+            "stages": stages,
+            "conversions": {
+                "applied_to_interview": applied_to_interview,
+                "interview_to_offer": interview_to_offer,
+            },
+            "weekly_activity": [{"week": k, **v} for k, v in list(weekly.items())[-6:]],
+            "top_recommendations": top_recommendations,
+        }
+    except Exception as e:
+        logger.error(f"Failed to calculate funnel stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

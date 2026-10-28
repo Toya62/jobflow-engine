@@ -103,3 +103,63 @@ export interface ApplicationDeleteRequest {
   position?: string | null;
   job_url?: string | null;
 }
+
+/** Funnel stats response (GET /api/funnel-stats). */
+export interface FunnelStatsResponse {
+  stages: {
+    draft: number;
+    applied: number;
+    screening: number;
+    interview: number;
+    offer: number;
+    rejected: number;
+    total: number;
+  };
+  conversions: {
+    applied_to_interview: number;
+    interview_to_offer: number;
+  };
+  weekly_activity: Array<{ week: string; applied: number; prepared: number }>;
+  top_recommendations: Array<{
+    id: number;
+    company: string;
+    title: string;
+    url: string;
+    location: string;
+    score: number;
+    archetype: string;
+    matched_skills: string;
+    gaps: string;
+    scraped_at: string;
+  }>;
+}
+
+/** Candidate profile response (GET /api/profile). */
+export interface CandidateProfileResponse {
+  personal_info: {
+    name: string;
+    email: string;
+    phone: string;
+    location: string;
+    relocation: string;
+    linkedin_url: string;
+    github_url: string;
+  };
+  education: Array<{
+    degree: string;
+    university: string;
+    graduation_year: string;
+    details: string;
+  }>;
+  skills: Record<string, string[] | string>;
+  languages: Record<string, string>;
+  projects: Array<{
+    name: string;
+    repo: string;
+    tech?: string[] | string;
+    description?: string;
+  }>;
+  experience_summary: string;
+  job_search_preferences?: Record<string, any>;
+  integrity_status: string;
+}
