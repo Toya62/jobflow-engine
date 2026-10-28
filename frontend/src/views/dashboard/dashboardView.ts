@@ -61,7 +61,6 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
     uncompiled_approved_count: stats.ready_to_generate?.length || 790,
   };
 
-  const readyToSubmit = stats.ready_to_submit || [];
   const readyToGenerate = stats.ready_to_generate || [];
   const portalHarvest = stats.portal_harvest || {};
   const aiRejections = stats.ai_rejections || {};
@@ -100,139 +99,30 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
         </div>
       </div>
 
-      <!-- Action Inbox Section -->
-      <section class="kjc-inbox-card">
-        <div class="kjc-inbox-header">
-          <div class="kjc-inbox-title-wrap">
-            <span class="kjc-inbox-title">Daily Action Inbox</span>
-            <span class="kjc-count-badge" id="inbox-badge">${readyToSubmit.length} waiting</span>
+      <!-- Quick-links to Apply Queue -->
+      <div class="kjc-dash-quicklinks">
+        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-submit" data-nav="jobs">
+          <div class="kjc-dash-ql-icon">📤</div>
+          <div>
+            <div class="kjc-dash-ql-num">${counts.ready_to_submit_count}</div>
+            <div class="kjc-dash-ql-label">Ready to Submit</div>
           </div>
-
-          <div class="kjc-inbox-nav">
-            <button type="button" class="kjc-inbox-tab-btn active" data-inbox="submit">
-              Ready to Submit (${readyToSubmit.length})
-            </button>
-            <button type="button" class="kjc-inbox-tab-btn" data-inbox="generate">
-              Approved &amp; Uncompiled (${counts.uncompiled_approved_count || readyToGenerate.length})
-            </button>
+        </button>
+        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-generate" data-nav="jobs">
+          <div class="kjc-dash-ql-icon">⚡</div>
+          <div>
+            <div class="kjc-dash-ql-num">${counts.uncompiled_approved_count || readyToGenerate.length}</div>
+            <div class="kjc-dash-ql-label">Approved — Generate CV</div>
           </div>
-        </div>
-
-        <div class="kjc-inbox-body">
-          <!-- View 1: Ready to Submit -->
-          <div class="kjc-inbox-table-wrap" id="inbox-view-submit">
-            ${
-              readyToSubmit.length === 0
-                ? `<div class="kjc-empty-queue">🎉 All prepared applications submitted! Generate new applications from the approved queue below.</div>`
-                : `
-                <table class="kjc-inbox-table">
-                  <thead>
-                    <tr>
-                      <th>Company &amp; Role</th>
-                      <th>Generated Date</th>
-                      <th>Compiled PDFs</th>
-                      <th>Application Portal</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="inbox-submit-tbody">
-                    ${readyToSubmit
-                      .map(
-                        (app) => `
-                      <tr data-company="${encodeURIComponent(app.company)}" data-pos="${encodeURIComponent(app.position)}">
-                        <td>
-                          <div class="kjc-inbox-company">${escapeHtml(app.company)}</div>
-                          <div class="kjc-inbox-pos">${escapeHtml(app.position)}</div>
-                        </td>
-                        <td>${escapeHtml(app.date_applied || "Recent")}</td>
-                        <td>
-                          <div style="display:flex;gap:6px;align-items:center;">
-                            ${
-                              app.cv_pdf_path
-                                ? `<a href="/${escapeHtml(app.cv_pdf_path)}" target="_blank" class="kjc-pdf-badge" title="Open CV PDF">📄 CV</a>`
-                                : `<span style="color:var(--text-muted);font-size:0.75rem;">No CV</span>`
-                            }
-                            ${
-                              app.cover_pdf_path
-                                ? `<a href="/${escapeHtml(app.cover_pdf_path)}" target="_blank" class="kjc-pdf-badge" title="Open Cover Letter PDF">📝 Anschreiben</a>`
-                                : ""
-                            }
-                          </div>
-                        </td>
-                        <td>
-                          ${
-                            app.job_url
-                              ? `<a href="${escapeHtml(app.job_url)}" target="_blank" rel="noopener noreferrer" class="kjc-pdf-badge" style="color:var(--accent-primary);">↗ Apply on Portal</a>`
-                              : `<span style="color:var(--text-muted);">Direct</span>`
-                          }
-                        </td>
-                        <td>
-                          <button type="button" class="kjc-mark-sent-btn" data-action="mark-sent" data-company="${escapeHtml(app.company)}" data-pos="${escapeHtml(app.position)}" data-url="${escapeHtml(app.job_url)}">
-                            ✓ Mark Sent
-                          </button>
-                        </td>
-                      </tr>
-                    `
-                      )
-                      .join("")}
-                  </tbody>
-                </table>
-              `
-            }
+        </button>
+        <button type="button" class="kjc-dash-ql-card kjc-dash-ql-crm" data-nav="crm">
+          <div class="kjc-dash-ql-icon">📋</div>
+          <div>
+            <div class="kjc-dash-ql-num">${counts.total_applied.toLocaleString()}</div>
+            <div class="kjc-dash-ql-label">Active Applications</div>
           </div>
-
-          <!-- View 2: Approved & Ready to Generate -->
-          <div class="kjc-inbox-table-wrap" id="inbox-view-generate" style="display: none;">
-            ${
-              readyToGenerate.length === 0
-                ? `<div class="kjc-empty-queue">No uncompiled approved jobs pending. Run scraper to harvest fresh postings.</div>`
-                : `
-                <table class="kjc-inbox-table">
-                  <thead>
-                    <tr>
-                      <th>Match</th>
-                      <th>Archetype</th>
-                      <th>Company &amp; Role</th>
-                      <th>Location</th>
-                      <th>Top Matching Skills</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${readyToGenerate
-                      .map(
-                        (job) => `
-                      <tr>
-                        <td>
-                          <span class="kjc-score-chip">${job.score}%</span>
-                        </td>
-                        <td>
-                          <span class="kjc-arch-chip ${escapeHtml(job.archetype)}">${formatArchetype(job.archetype)}</span>
-                        </td>
-                        <td>
-                          <div class="kjc-inbox-company">${escapeHtml(job.company)}</div>
-                          <div class="kjc-inbox-pos">${escapeHtml(job.title)}</div>
-                        </td>
-                        <td>${escapeHtml(job.location || "Germany / Remote")}</td>
-                        <td style="max-width: 280px; font-size: 0.78rem; color: var(--text-secondary);">
-                          ${escapeHtml(job.matched_skills || "Python, Docker, CI/CD")}
-                        </td>
-                        <td>
-                          <button type="button" class="kjc-gen-btn" data-action="tailor-job" data-company="${escapeHtml(job.company)}">
-                            ⚡ Tailor &amp; Generate
-                          </button>
-                        </td>
-                      </tr>
-                    `
-                      )
-                      .join("")}
-                  </tbody>
-                </table>
-              `
-            }
-          </div>
-        </div>
-      </section>
+        </button>
+      </div>
 
       <!-- Pipeline Engine Pulse Grid (3 Columns) -->
       <div class="kjc-engine-grid">
@@ -318,72 +208,14 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
     </div>
   `;
 
-  // Attach Inbox tab switcher
-  const inboxTabs = container.querySelectorAll<HTMLButtonElement>(".kjc-inbox-tab-btn");
-  const viewSubmit = container.querySelector<HTMLElement>("#inbox-view-submit");
-  const viewGenerate = container.querySelector<HTMLElement>("#inbox-view-generate");
-
-  inboxTabs.forEach((btn) => {
+  // Quicklink cards → navigate to jobs or crm tab
+  container.querySelectorAll<HTMLButtonElement>("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      inboxTabs.forEach((t) => t.classList.remove("active"));
-      btn.classList.add("active");
-      const target = btn.dataset.inbox;
-      if (target === "submit") {
-        if (viewSubmit) viewSubmit.style.display = "block";
-        if (viewGenerate) viewGenerate.style.display = "none";
-      } else {
-        if (viewSubmit) viewSubmit.style.display = "none";
-        if (viewGenerate) viewGenerate.style.display = "block";
-      }
-    });
-  });
-
-  // Attach Mark Sent buttons
-  container.querySelectorAll<HTMLButtonElement>('[data-action="mark-sent"]').forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const company = btn.dataset.company || "";
-      const position = btn.dataset.pos || "";
-      const jobUrl = btn.dataset.url || "";
-      btn.disabled = true;
-      btn.textContent = "Updating…";
-
-      try {
-        await api.updateApplication({
-          company,
-          position,
-          job_url: jobUrl,
-          status: "Applied",
-        });
-
-        // Remove row smoothly
-        const row = btn.closest("tr");
-        if (row) {
-          row.style.opacity = "0.3";
-          row.style.background = "var(--accent-success-soft)";
-          setTimeout(() => {
-            row.remove();
-            const badge = container.querySelector("#inbox-badge");
-            const currentRows = container.querySelectorAll("#inbox-submit-tbody tr").length;
-            if (badge) badge.textContent = `${currentRows} waiting`;
-          }, 350);
-        }
-      } catch (err) {
-        btn.disabled = false;
-        btn.textContent = "Error";
-        alert(`Failed to update application status: ${String(err)}`);
-      }
-    });
-  });
-
-  // Attach Tailor buttons to jump to Job Finder
-  container.querySelectorAll<HTMLButtonElement>('[data-action="tailor-job"]').forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const company = btn.dataset.company || "";
+      const target = btn.dataset.nav as string;
       const url = new URL(window.location.href);
-      url.searchParams.set("view", "jobs");
-      url.searchParams.set("q", company);
-      window.history.pushState({}, "", url.toString());
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      url.searchParams.set("view", target);
+      window.history.pushState({ view: target }, "", url.toString());
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { view: target } }));
     });
   });
 }

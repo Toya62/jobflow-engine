@@ -56,8 +56,8 @@ if (!root) throw new Error("Root element #app not found");
             <span class="kjc-tab-label">Dashboard</span>
           </button>
           <button type="button" role="tab" class="kjc-tab" data-view="jobs" aria-selected="false" aria-controls="jobs-panel" id="tab-jobs">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            <span class="kjc-tab-label">Job Finder</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+            <span class="kjc-tab-label">Apply Queue</span>
           </button>
           <button type="button" role="tab" class="kjc-tab" data-view="crm" aria-selected="false" aria-controls="crm-panel" id="tab-crm">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14H6v-6h4v6zm5 0h-4v-8h4v8zm4 0h-3v-4h3v4z"/></svg>
@@ -130,6 +130,10 @@ if (!root) throw new Error("Root element #app not found");
   const mountView = async (view: ViewMode): Promise<void> => {
     setActiveTab(view);
 
+    // Fade-out current content
+    viewContainer.style.opacity = "0";
+    viewContainer.style.transform = "translateY(6px)";
+
     if (view === "dashboard") {
       await import("./views/dashboard/dashboardView").then(({ mountDashboardView }) =>
         mountDashboardView(viewContainer)
@@ -160,6 +164,13 @@ if (!root) throw new Error("Root element #app not found");
         mountJobsView(viewContainer, parseState(window.location.search))
       );
     }
+
+    // Fade-in after mount
+    requestAnimationFrame(() => {
+      viewContainer.style.transition = "opacity 0.22s ease, transform 0.22s ease";
+      viewContainer.style.opacity = "1";
+      viewContainer.style.transform = "translateY(0)";
+    });
   };
 
   // Initial mount

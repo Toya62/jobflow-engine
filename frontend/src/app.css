@@ -297,6 +297,9 @@ button, input, select, textarea { font-family: inherit; }
   flex: 1;
   display: flex;
   flex-direction: column;
+  /* Initial state for view transitions */
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -307,7 +310,10 @@ button, input, select, textarea { font-family: inherit; }
   flex-direction: column;
   gap: 0;
   flex: 1;
-  padding: 18px 22px 14px;
+  padding: 1.25rem 2rem 3rem;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* ─── View Header (dataset + counts) ─── */
@@ -679,26 +685,68 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   COLUMN WIDTHS — JOBS
+   COLUMN WIDTHS — JOBS (Apply Queue)
 ═══════════════════════════════════════════════════════════════ */
 .kjc-col-select  { flex: 0 0 44px; justify-content: center; padding: 0 8px; }
-.kjc-col-title   { flex: 1 1 auto; min-width: 220px; font-weight: 600; }
-.kjc-col-company { flex: 0 0 180px; font-weight: 500; color: var(--text-primary); }
-.kjc-col-location{ flex: 0 0 160px; color: var(--text-secondary); font-size: 0.84rem; }
-.kjc-col-score   { flex: 0 0 80px; justify-content: center; font-weight: 700; color: var(--accent-success); font-variant-numeric: tabular-nums; }
+.kjc-col-title   { flex: 2.2 1 240px; min-width: 200px; font-weight: 600; }
+.kjc-col-company { flex: 1.5 1 170px; min-width: 140px; font-weight: 500; color: var(--text-primary); }
+.kjc-col-location{ flex: 1.2 1 150px; min-width: 120px; color: var(--text-secondary); font-size: 0.84rem; }
+.kjc-col-score   { flex: 0 0 85px; justify-content: center; font-weight: 700; color: var(--accent-success); font-variant-numeric: tabular-nums; }
 .kjc-col-date    { flex: 0 0 95px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-secondary); }
-.kjc-col-actions { flex: 0 0 180px; gap: 6px; }
+.kjc-col-actions { flex: 0 0 180px; gap: 8px; justify-content: flex-end; padding-right: 12px; }
 
 /* ═══════════════════════════════════════════════════════════════
-   COLUMN WIDTHS — CRM (override)
+   COLUMN WIDTHS — CRM (Scoped to #crm-panel)
 ═══════════════════════════════════════════════════════════════ */
 
-/* CRM: company = title col, position = secondary */
-#crm-panel .kjc-col-title   { flex: 0 0 180px; }
-#crm-panel .kjc-col-company { flex: 1 1 auto; min-width: 160px; }
-#crm-panel .kjc-col-status  { flex: 0 0 130px; position: relative; }
-#crm-panel .kjc-col-date    { flex: 0 0 100px; }
-#crm-panel .kjc-col-actions { flex: 0 0 100px; }
+/* CRM: position = title col, company = secondary */
+#crm-panel .kjc-col-title   { flex: 2 1 220px; min-width: 180px; }
+#crm-panel .kjc-col-company { flex: 1.5 1 170px; min-width: 140px; font-weight: 500; }
+#crm-panel .kjc-col-status  { flex: 0 0 135px; position: relative; }
+#crm-panel .kjc-col-date    { flex: 0 0 95px; font-family: var(--font-mono); font-size: 0.82rem; }
+#crm-panel .kjc-col-link    { flex: 0 0 85px; }
+#crm-panel .kjc-col-actions { flex: 0 0 115px; gap: 6px; justify-content: flex-end; padding-right: 12px; }
+
+/* ─── Keyboard Navigation Row Highlight ─── */
+.kjc-row.is-kb-active {
+  background: var(--bg-elevated) !important;
+  outline: 2px solid var(--accent-primary) !important;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+/* ─── Keyboard Shortcut Hint Footer ─── */
+.kjc-keyboard-hint {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  margin-top: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.kjc-hint-title {
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.kjc-keyboard-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-primary);
+  margin-right: 3px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+}
 
 /* ═══════════════════════════════════════════════════════════════
    BUTTONS

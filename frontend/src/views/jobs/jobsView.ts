@@ -115,9 +115,9 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   root.innerHTML = `
-    <div class="kjc-shell">
+    <div class="kjc-shell" id="jobs-panel">
       <header class="kjc-header">
-        <div class="kjc-brand"><span>Jobs</span></div>
+        <div class="kjc-brand"><span>Apply Queue</span></div>
         <div class="kjc-toolbar">
           <label class="kjc-field">Dataset
             <select id="kjc-dataset"></select>
@@ -178,6 +178,14 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
           <div class="kjc-spacer" id="kjc-spacer"></div>
           <div class="kjc-rows" id="kjc-rows"></div>
         </div>
+      </div>
+      <div class="kjc-keyboard-hint">
+        <span class="kjc-hint-title">⚡ Quick Nav:</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> Browse</span>
+        <span><kbd>Enter</kbd> Details</span>
+        <span><kbd>G</kbd> Generate CV</span>
+        <span><kbd>Space</kbd> Select</span>
+        <span><kbd>Esc</kbd> Close</span>
       </div>
     </div>`;
 
@@ -465,9 +473,29 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
     titleButton.addEventListener("click", () => drawer.open(job));
     titleCell.appendChild(titleButton);
 
+    const arch = (job as any).target_archetype || (job as any).archetype;
+    if (arch) {
+      const archChip = element("span", `kjc-arch-chip ${String(arch).toLowerCase()}`, formatArchetype(String(arch)));
+      archChip.style.marginLeft = "8px";
+      archChip.style.fontSize = "0.68rem";
+      archChip.style.padding = "2px 6px";
+      titleCell.appendChild(archChip);
+    }
+
     const companyCell = element("div", "kjc-cell kjc-col-company", String(job.company ?? ""));
     const locationCell = element("div", "kjc-cell kjc-col-location", String(job.location ?? "—"));
-    const scoreCell = element("div", "kjc-cell kjc-col-score", String(job.score ?? 0));
+    
+    const scoreCell = element("div", "kjc-cell kjc-col-score");
+    const numScore = Number(job.score ?? 0);
+    if (numScore > 0) {
+      const chip = element("span", "kjc-score-chip", `${numScore}%`);
+      scoreCell.appendChild(chip);
+    } else {
+      const emptyScore = element("span", undefined, "—");
+      emptyScore.style.color = "var(--text-muted)";
+      scoreCell.appendChild(emptyScore);
+    }
+
     const dateCell = element("div", "kjc-cell kjc-col-date", jobDate(job) || "—");
 
     const actionsCell = element("div", "kjc-cell kjc-col-actions");
@@ -1029,4 +1057,75 @@ function paintModeButtons(): void {
   });
 
   void checkPendingMatches();
+
+  // ─── Innovative Feature: Keyboard Navigation (Linear / Superhuman standard) ───
+  let activeIndex = -1;
+
+  function setActiveRow(index: number): void {
+    if (index < 0 || index >= currentRows.length) return;
+    activeIndex = index;
+    const allRowNodes = rowsEl.querySelectorAll<HTMLElement>(".kjc-row");
+    allRowNodes.forEach((r) => r.classList.remove("is-kb-active"));
+    const targetRow = rowsEl.querySelector<HTMLElement>(`.kjc-row[style*="translateY(${index * ROW_HEIGHT}px)"]`);
+    if (targetRow) {
+      targetRow.classList.add("is-kb-active");
+    }
+    const targetTop = index * ROW_HEIGHT;
+    const currentScroll = viewport.scrollTop;
+    if (targetTop < currentScroll) {
+      viewport.scrollTop = targetTop;
+    } else if (targetTop + ROW_HEIGHT > currentScroll + viewport.clientHeight) {
+      viewport.scrollTop = targetTop + ROW_HEIGHT - viewport.clientHeight;
+    }
+  }
+
+  const onKeydown = (e: KeyboardEvent): void => {
+    if (!root.isConnected) {
+      window.removeEventListener("keydown", onKeydown);
+      return;
+    }
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "SELECT" || activeEl.tagName === "TEXTAREA")) {
+      return;
+    }
+    if (currentRows.length === 0) return;
+
+    if (e.key === "ArrowDown" || e.key === "j") {
+      e.preventDefault();
+      setActiveRow(Math.min(currentRows.length - 1, activeIndex + 1));
+    } else if (e.key === "ArrowUp" || e.key === "k") {
+      e.preventDefault();
+      setActiveRow(Math.max(0, activeIndex - 1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      drawer.open(currentRows[activeIndex]);
+    } else if ((e.key === "g" || e.key === "G") && activeIndex >= 0) {
+      e.preventDefault();
+      const job = currentRows[activeIndex];
+      const key = jobKey(job);
+      void triggerDirectGeneration(job, key);
+    } else if (e.key === " " && activeIndex >= 0) {
+      e.preventDefault();
+      const job = currentRows[activeIndex];
+      const key = jobKey(job);
+      if (selected.has(key)) selected.delete(key);
+      else selected.add(key);
+      applyWindow();
+      updateSelectionUI();
+    } else if (e.key === "Escape") {
+      drawer.close();
+      jobGenDrawer.close();
+    }
+  };
+
+  window.addEventListener("keydown", onKeydown);
+}
+
+function formatArchetype(arch: string): string {
+  const norm = arch.toLowerCase();
+  if (norm.includes("cpp")) return "C++ / Auto";
+  if (norm.includes("backend")) return "Python Backend";
+  if (norm.includes("data")) return "Data / PyFlink";
+  if (norm.includes("devsecops")) return "DevSecOps";
+  return arch.replace(/_/g, " ");
 }

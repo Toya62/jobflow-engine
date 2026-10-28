@@ -82,7 +82,7 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   root.innerHTML = `
-    <div class="kjc-shell">
+    <div class="kjc-shell" id="crm-panel">
       <header class="kjc-header">
         <div class="kjc-brand"><span>CRM Tracker</span></div>
         <div class="kjc-toolbar">
@@ -118,6 +118,13 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
         </div>
       </div>
       <div class="kjc-board hidden" id="kjc-board"></div>
+      <div class="kjc-keyboard-hint">
+        <span class="kjc-hint-title">⚡ Quick Nav:</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> Browse</span>
+        <span><kbd>Enter</kbd> Details</span>
+        <span><kbd>Space</kbd> Select</span>
+        <span><kbd>Esc</kbd> Close</span>
+      </div>
     </div>`;
 
   const byId = <T extends HTMLElement>(id: string): T => {
@@ -760,6 +767,62 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
   paintHead();
   refreshStatusFilter();
   await loadRecords();
+
+  // Keyboard navigation for CRM
+  let activeIndex = -1;
+
+  function setActiveRow(index: number): void {
+    if (index < 0 || index >= currentRecords.length) return;
+    activeIndex = index;
+    const allRowNodes = rowsEl.querySelectorAll<HTMLElement>(".kjc-row");
+    allRowNodes.forEach((r) => r.classList.remove("is-kb-active"));
+    const targetRow = rowsEl.querySelector<HTMLElement>(`.kjc-row[style*="translateY(${index * CRM_ROW_HEIGHT}px)"]`);
+    if (targetRow) {
+      targetRow.classList.add("is-kb-active");
+    }
+    const targetTop = index * CRM_ROW_HEIGHT;
+    const currentScroll = viewport.scrollTop;
+    if (targetTop < currentScroll) {
+      viewport.scrollTop = targetTop;
+    } else if (targetTop + CRM_ROW_HEIGHT > currentScroll + viewport.clientHeight) {
+      viewport.scrollTop = targetTop + CRM_ROW_HEIGHT - viewport.clientHeight;
+    }
+  }
+
+  const onKeydown = (e: KeyboardEvent): void => {
+    if (!root.isConnected) {
+      window.removeEventListener("keydown", onKeydown);
+      return;
+    }
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "SELECT" || activeEl.tagName === "TEXTAREA")) {
+      return;
+    }
+    if (currentRecords.length === 0) return;
+
+    if (e.key === "ArrowDown" || e.key === "j") {
+      e.preventDefault();
+      setActiveRow(Math.min(currentRecords.length - 1, activeIndex + 1));
+    } else if (e.key === "ArrowUp" || e.key === "k") {
+      e.preventDefault();
+      setActiveRow(Math.max(0, activeIndex - 1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      drawer.open(currentRecords[activeIndex]);
+    } else if (e.key === " " && activeIndex >= 0) {
+      e.preventDefault();
+      const record = currentRecords[activeIndex];
+      const key = crmJobKey(record);
+      if (selected.has(key)) selected.delete(key);
+      else selected.add(key);
+      paint(true);
+      updateSelectionUI();
+    } else if (e.key === "Escape") {
+      drawer.close();
+    }
+  };
+
+  window.addEventListener("keydown", onKeydown);
 }
 
 export { crmJobKey, crmSortValue };

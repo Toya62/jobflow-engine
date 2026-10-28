@@ -124,7 +124,62 @@
   color: var(--text-secondary);
 }
 
-/* ─── Action Inbox Card ─── */
+/* ─── Quick-link Action Cards ─── */
+.kjc-dash-quicklinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.kjc-dash-ql-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.kjc-dash-ql-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+.kjc-dash-ql-card:active {
+  transform: scale(0.97);
+}
+
+.kjc-dash-ql-submit { border-left: 3px solid var(--accent-warning); }
+.kjc-dash-ql-generate { border-left: 3px solid var(--accent-primary); }
+.kjc-dash-ql-crm { border-left: 3px solid var(--accent-success); }
+
+.kjc-dash-ql-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.kjc-dash-ql-num {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.kjc-dash-ql-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* ─── Action Inbox Card (legacy — keep for reference only) ─── */
 .kjc-inbox-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
