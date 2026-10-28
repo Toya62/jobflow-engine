@@ -30,16 +30,34 @@ TRACKER_COLUMNS = [
 
 
 def load_tracker_df() -> pd.DataFrame:
-    """Load the CRM tracker view (applications joined to their job)."""
+    """Load the CRM tracker view (applications joined to their job).
+
+    The SELECT list is built dynamically from ``PRAGMA table_info`` so an older
+    database that predates the ``sent_at`` / ``follow_up_at`` columns still loads
+    instead of erroring out and silently returning an empty frame.
+    """
     db_path = os.path.join('data', 'karriere.db')
     if is_postgres() or os.path.exists(db_path):
         try:
             conn = get_db_connection(db_path)
-            q = '''
+            # Probe available columns; fall back to the legacy projection.
+            extra_cols = []
+            try:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(applications)")
+                cols = {r[1] for r in cursor.fetchall()}
+                for name in ("sent_at", "sent_method", "sent_to", "follow_up_at"):
+                    if name in cols:
+                        extra_cols.append(name)
+            except Exception:
+                pass
+
+            select_extra = ", ".join(f"a.{c}" for c in extra_cols)
+            q = f'''
             SELECT j.company, j.title as position, a.applied_at as date_applied,
                    'AI Generated' as source, j.url as job_url,
-                   a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status as status, a.applied_at as updated_at,
-                   a.sent_at, a.sent_method, a.sent_to, a.follow_up_at
+                   a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status as status, a.applied_at as updated_at
+                   {f", {select_extra}" if select_extra else ""}
             FROM applications a
             JOIN jobs j ON a.job_id = j.id
             '''
