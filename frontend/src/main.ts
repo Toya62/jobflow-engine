@@ -47,7 +47,7 @@ if (!root) throw new Error("Root element #app not found");
           </svg>
           <div>
             <div style="font-family:var(--font-display);font-size:1.3rem;font-weight:600;letter-spacing:-0.015em;">Karriere Pipeline</div>
-            <div class="kjc-brand-sub">Job Intelligence & Dossier Platform</div>
+            <div class="kjc-brand-sub">Job Intelligence</div>
           </div>
         </div>
         <nav class="kjc-tab-bar" role="tablist" aria-label="Main views">

@@ -1227,7 +1227,7 @@ button, input, select, textarea { font-family: inherit; }
 .kjc-source-bund     { background: rgba(240,169,63,0.14); color: #fcd68a; border: 1px solid rgba(240,169,63,0.3); }
 
 /* ═══════════════════════════════════════════════════════════════
-   VIEW TOGGLE & KANBAN BOARD (Dossier-style)
+   VIEW TOGGLE & KANBAN BOARD
 ═══════════════════════════════════════════════════════════════ */
 .kjc-view-toggle {
   display: inline-flex;
@@ -1415,7 +1415,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   CANDIDATE PROFILE VIEW (Dossier-style)
+   CANDIDATE PROFILE VIEW
 ═══════════════════════════════════════════════════════════════ */
 .kjc-profile-shell {
   display: flex;
