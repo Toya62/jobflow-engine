@@ -39,6 +39,10 @@ const DATE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ["30d", "Last 30 Days"],
 ];
 
+// Module-level in-memory cache to make tab switches instant (0ms)
+let jobsCache: { dataset: string; data: JobRecord[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 60_000;
+
 function jobKey(job: JobRecord): string {
   return String(job.job_url || `${job.company ?? ""}|${job.title ?? ""}`);
 }
@@ -852,38 +856,70 @@ function paintModeButtons(): void {
   });
 
   async function loadJobs(): Promise<void> {
+    const isCached = jobsCache && jobsCache.dataset === state.dataset && (Date.now() - jobsCache.timestamp < CACHE_TTL_MS);
+
+    if (isCached && jobsCache) {
+      allJobs = jobsCache.data;
+      statusEl.textContent = "";
+      paintBatchOptions();
+      paint();
+      // Reconcile status in background without blocking paint
+      void reconcileTrackerAndActive();
+      return;
+    }
+
     statusEl.textContent = "Loading…";
     rowsEl.replaceChildren();
     spacer.style.height = "0px";
+
     try {
       allJobs = await api.jobs(state.dataset);
+      jobsCache = { dataset: state.dataset, data: allJobs, timestamp: Date.now() };
       statusEl.textContent = "";
 
-      // Match and pre-populate already generated applications from CRM tracker
-      try {
-        const trackerRecords = await api.tracker();
-        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Paint immediately so user sees table without delay!
+      paintBatchOptions();
+      paint();
+
+      // Background non-blocking reconciliation
+      void reconcileTrackerAndActive();
+    } catch (error) {
+      allJobs = [];
+      currentRows = [];
+      statusEl.textContent = `Failed to load jobs: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  async function reconcileTrackerAndActive(): Promise<void> {
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    try {
+      // 1. Fetch tracker & active tasks in parallel
+      const [trackerRes, activeRes] = await Promise.allSettled([
+        api.tracker(),
+        api.activeGenerations(),
+      ]);
+
+      // Fast Map indexing for tracker records (O(M) instead of 4 million iterations)
+      if (trackerRes.status === "fulfilled" && Array.isArray(trackerRes.value)) {
+        const urlMap = new Map<string, any>();
+        const compTitleMap = new Map<string, any>();
+        for (const rec of trackerRes.value) {
+          if (!rec.cv_pdf_path) continue;
+          const u = String(rec.job_url || "").trim().toLowerCase();
+          if (u) urlMap.set(u, rec);
+          const cKey = `${norm(String(rec.company || ""))}::${norm(String(rec.position || ""))}`;
+          if (cKey !== "::") compTitleMap.set(cKey, rec);
+        }
+
         for (const job of allJobs) {
           const key = jobKey(job);
           if (jobGenStates.has(key)) continue;
-          const jUrl = String(job.job_url || "").trim();
-          const jComp = norm(String(job.company || ""));
-          const jTitle = norm(String(job.title || ""));
-          const matched = trackerRecords.find((rec) => {
-            if (!rec.cv_pdf_path) return false;
-            const rUrl = String(rec.job_url || "").trim();
-            if (jUrl && rUrl && jUrl === rUrl) return true;
-            const rComp = norm(String(rec.company || ""));
-            const rTitle = norm(String(rec.position || ""));
-            return (
-              jComp &&
-              rComp &&
-              (jComp === rComp || jComp.includes(rComp) || rComp.includes(jComp)) &&
-              jTitle &&
-              rTitle &&
-              (jTitle === rTitle || jTitle.includes(rTitle) || rTitle.includes(jTitle))
-            );
-          });
+          const jUrl = String(job.job_url || "").trim().toLowerCase();
+          let matched = jUrl ? urlMap.get(jUrl) : undefined;
+          if (!matched) {
+            matched = compTitleMap.get(`${norm(String(job.company || ""))}::${norm(String(job.title || ""))}`);
+          }
           if (matched && matched.cv_pdf_path) {
             jobGenStates.set(key, {
               status: "ready",
@@ -892,28 +928,26 @@ function paintModeButtons(): void {
               coverPath: matched.cover_pdf_path,
               message: "Application already generated.",
             });
+            syncAllGenButtons(key);
           }
         }
-      } catch {
-        /* ignore tracker fetch failure */
       }
 
-      // Restore active, queued, or running generations across page reloads
-      try {
-        const activeData = await api.activeGenerations();
-        const activeTasks = activeData?.tasks || {};
-        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Fast Map indexing for active tasks
+      if (activeRes.status === "fulfilled" && activeRes.value?.tasks) {
+        const activeTasks = activeRes.value.tasks;
         for (const [tKey, task] of Object.entries<any>(activeTasks)) {
           if (!task || !task.status) continue;
           const tComp = norm(String(task.company || ""));
           const tPos = norm(String(task.position || ""));
-          const tUrl = String(task.job_url || "").trim();
+          const tUrl = String(task.job_url || "").trim().toLowerCase();
+
           for (const job of allJobs) {
             const key = jobKey(job);
             if (jobGenStates.get(key)?.status === "ready") continue;
             const jComp = norm(String(job.company || ""));
             const jTitle = norm(String(job.title || ""));
-            const jUrl = String(job.job_url || "").trim();
+            const jUrl = String(job.job_url || "").trim().toLowerCase();
             const matchUrl = Boolean(tUrl && jUrl && tUrl === jUrl);
             const matchText = Boolean(
               tComp && jComp && (tComp === jComp || tComp.includes(jComp) || jComp.includes(tComp)) &&
@@ -947,20 +981,14 @@ function paintModeButtons(): void {
                   coverPath: flat.cover_path,
                   message: flat.message || "Generated successfully!",
                 });
+                syncAllGenButtons(key);
               }
             }
           }
         }
-      } catch {
-        /* ignore active generations fetch failure */
       }
-
-      paintBatchOptions();
-      paint();
-    } catch (error) {
-      allJobs = [];
-      currentRows = [];
-      statusEl.textContent = `Failed to load jobs: ${error instanceof Error ? error.message : String(error)}`;
+    } catch {
+      /* ignore background reconciliation error */
     }
   }
 
