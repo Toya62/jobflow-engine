@@ -73,6 +73,12 @@ if (!root) throw new Error("Root element #app not found");
           </button>
           <span class="kjc-tab-indicator" aria-hidden="true"></span>
         </nav>
+        <div class="kjc-header-actions">
+          <button type="button" class="kjc-theme-btn" id="kjc-theme-toggle" aria-label="Toggle theme">
+            <span class="theme-icon">☀️</span>
+            <span class="theme-label">Light</span>
+          </button>
+        </div>
       </header>
       <main class="kjc-app-main" id="kjc-view-container"></main>
     </div>
@@ -83,6 +89,26 @@ if (!root) throw new Error("Root element #app not found");
   const viewContainer = root.querySelector<HTMLElement>("#kjc-view-container")!;
   const tabs = root.querySelectorAll<HTMLButtonElement>(".kjc-tab");
   const indicator = root.querySelector<HTMLElement>(".kjc-tab-indicator")!;
+  const themeToggle = root.querySelector<HTMLButtonElement>("#kjc-theme-toggle");
+
+  const savedTheme = localStorage.getItem("karriere_theme") || "light";
+  document.documentElement.dataset.theme = savedTheme;
+  updateThemeButton(savedTheme);
+
+  function updateThemeButton(theme: string): void {
+    if (!themeToggle) return;
+    const isDark = theme === "dark";
+    themeToggle.innerHTML = isDark
+      ? `<span class="theme-icon">🌙</span><span class="theme-label">Dark</span>`
+      : `<span class="theme-icon">☀️</span><span class="theme-label">Light</span>`;
+  }
+
+  themeToggle?.addEventListener("click", () => {
+    const current = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = current;
+    localStorage.setItem("karriere_theme", current);
+    updateThemeButton(current);
+  });
 
   function updateIndicator(activeTab: HTMLButtonElement): void {
     const rect = activeTab.getBoundingClientRect();

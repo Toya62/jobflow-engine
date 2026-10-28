@@ -106,6 +106,40 @@ export interface ApplicationDeleteRequest {
 
 /** Funnel stats response (GET /api/funnel-stats). */
 export interface FunnelStatsResponse {
+  counts?: {
+    total_jobs: number;
+    pending_evaluations: number;
+    total_evaluated: number;
+    total_approved: number;
+    total_applied: number;
+    ready_to_submit_count: number;
+    uncompiled_approved_count: number;
+  };
+  ready_to_submit?: Array<{
+    company: string;
+    position: string;
+    status: string;
+    date_applied: string;
+    cv_pdf_path: string;
+    cover_pdf_path: string;
+    job_url: string;
+    notes?: string;
+  }>;
+  ready_to_generate?: Array<{
+    id: number;
+    company: string;
+    title: string;
+    location: string;
+    score: number;
+    archetype: string;
+    matched_skills: string;
+    gaps: string;
+    url: string;
+    scraped_at: string;
+  }>;
+  portal_harvest?: Record<string, number>;
+  ai_rejections?: Record<string, number>;
+  archetype_distribution?: Record<string, number>;
   stages: {
     draft: number;
     applied: number;

@@ -5,63 +5,98 @@
    Mirrors dashboard/style.css but scoped to kjc-* class contract.
 */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ═══════════════════════════════════════════════════════════════
-   DESIGN TOKENS
+   DESIGN TOKENS — High-Precision Engineering Standard
 ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* Surfaces */
-  --bg-dark: #090b10;
-  --bg-panel: #12151d;
-  --bg-card: #171b26;
-  --bg-elevated: #1d2230;
-  --bg-input: #0d0f16;
+  /* Surfaces: Clean, High-Contrast Light Theme */
+  --bg-dark: #f8fafc;
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --bg-input: #ffffff;
 
-  /* Borders */
-  --border-color: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.15);
-  --border-focus: rgba(91, 141, 239, 0.45);
+  /* Borders: Crisp, Subdued Slate */
+  --border-color: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #2563eb;
 
-  /* Text */
-  --text-primary: #f1f3f8;
-  --text-secondary: #a6aec1;
-  --text-muted: #676f83;
+  /* Text: High Contrast Slate */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
 
-  /* Accent — sapphire */
-  --accent-primary: #5b8bef;
-  --accent-primary-hover: #4574db;
-  --accent-primary-soft: rgba(91, 139, 239, 0.14);
+  /* Accent — Executive Blue */
+  --accent-primary: #2563eb;
+  --accent-primary-hover: #1d4ed8;
+  --accent-primary-soft: #eff6ff;
 
-  /* Accent — brass */
-  --accent-brass: #c9a15f;
-  --accent-brass-hover: #dab577;
-  --accent-brass-soft: rgba(201, 161, 95, 0.14);
+  /* Accent — Amber */
+  --accent-brass: #b45309;
+  --accent-brass-hover: #92400e;
+  --accent-brass-soft: #fef3c7;
 
   /* Semantic */
-  --accent-success: #38d39a;
-  --accent-success-soft: rgba(56, 211, 154, 0.12);
-  --accent-warning: #f0a93f;
-  --accent-warning-soft: rgba(240, 169, 63, 0.12);
-  --accent-danger: #ef5875;
-  --accent-danger-soft: rgba(239, 88, 117, 0.12);
+  --accent-success: #059669;
+  --accent-success-soft: #ecfdf5;
+  --accent-warning: #d97706;
+  --accent-warning-soft: #fffbeb;
+  --accent-danger: #dc2626;
+  --accent-danger-soft: #fef2f2;
 
-  --accent-purple: #a78bfa;
-  --accent-cyan: #22d3ee;
+  --accent-purple: #7c3aed;
+  --accent-cyan: #0284c7;
 
-  /* Type */
-  --font-display: 'Fraunces', 'Outfit', serif;
-  --font-body: 'Inter', 'Outfit', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Typography: Professional, Legible, Crisp */
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.22);
-  --shadow-md: 0 10px 28px rgba(0,0,0,0.38);
-  --shadow-lg: 0 28px 64px rgba(0,0,0,0.55);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-pill: 999px;
+  --transition: all 0.15s ease;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+}
+
+[data-theme="dark"] {
+  --bg-dark: #0b0f19;
+  --bg-panel: #111827;
+  --bg-card: #1f2937;
+  --bg-elevated: #374151;
+  --bg-input: #111827;
+
+  --border-color: #374151;
+  --border-strong: #4b5563;
+  --border-focus: #3b82f6;
+
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #60a5fa;
+  --accent-primary-soft: rgba(59, 130, 246, 0.15);
+
+  --accent-brass: #f59e0b;
+  --accent-brass-hover: #fbbf24;
+  --accent-brass-soft: rgba(245, 158, 11, 0.15);
+
+  --accent-success: #10b981;
+  --accent-success-soft: rgba(16, 185, 129, 0.15);
+  --accent-warning: #f59e0b;
+  --accent-warning-soft: rgba(245, 158, 11, 0.15);
+  --accent-danger: #ef4444;
+  --accent-danger-soft: rgba(239, 68, 68, 0.15);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -73,26 +108,24 @@
   padding: 0;
 }
 
-html { color-scheme: dark; }
+html { color-scheme: light dark; }
 
 body {
-  background:
-    radial-gradient(1100px 620px at 14% -8%, rgba(91, 139, 239, 0.07), transparent 60%),
-    radial-gradient(900px 560px at 100% 0%, rgba(201, 161, 95, 0.05), transparent 55%),
-    var(--bg-dark);
-  background-attachment: fixed;
+  background: var(--bg-dark);
   color: var(--text-primary);
   font-family: var(--font-body);
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
-  font-size: 15px;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 button, input, select, textarea { font-family: inherit; }
@@ -102,10 +135,10 @@ button, input, select, textarea { font-family: inherit; }
   outline-offset: 2px;
 }
 
-::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.26); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ═══════════════════════════════════════════════════════════════
    APP SHELL
@@ -125,22 +158,13 @@ button, input, select, textarea { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 22px;
-  background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel) 60%, #10131b);
+  padding: 10px 24px;
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border-color);
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 200;
   gap: 20px;
-}
-
-.kjc-app-header::after {
-  content: '';
-  position: absolute;
-  left: 22px; right: 22px; bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent-brass-soft) 40%, transparent);
-  opacity: 0.6;
-  pointer-events: none;
 }
 
 .kjc-app-brand {
@@ -216,14 +240,16 @@ button, input, select, textarea { font-family: inherit; }
 
 .kjc-tab:hover { color: var(--text-primary); }
 
-.kjc-tab.active { color: var(--text-primary); }
+.kjc-tab.active {
+  color: var(--accent-primary);
+}
 
 .kjc-tab.active::after {
   content: '';
   position: absolute;
   bottom: -1px; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent-brass), var(--accent-primary));
+  background: var(--accent-primary);
   border-radius: 2px 2px 0 0;
 }
 
@@ -233,10 +259,37 @@ button, input, select, textarea { font-family: inherit; }
   position: absolute;
   bottom: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent-brass), var(--accent-primary));
+  background: var(--accent-primary);
   border-radius: 2px 2px 0 0;
-  transition: width 0.25s cubic-bezier(0.4,0,0.2,1), transform 0.25s cubic-bezier(0.4,0,0.2,1);
+  transition: width 0.2s ease, transform 0.2s ease;
   pointer-events: none;
+}
+
+/* ─── Header Theme Switcher ─── */
+.kjc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kjc-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.kjc-theme-btn:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
 }
 
 /* ─── App Main ─── */

@@ -248,10 +248,12 @@ def delete_application(payload: ApplicationDeleteRequest | None = None, keep_job
 
 @router.get("/funnel-stats")
 def get_funnel_stats():
-    """Return application funnel metrics, weekly breakdown, and top recommended jobs."""
+    """Return operational command-center metrics, action inbox queues, and pipeline intelligence."""
     try:
-        from collections import defaultdict
+        from collections import defaultdict, Counter
         from datetime import datetime
+        from urllib.parse import urlparse
+
         df = load_tracker_df()
         stages = {
             "draft": 0,
@@ -262,6 +264,7 @@ def get_funnel_stats():
             "rejected": 0,
             "total": 0,
         }
+        ready_to_submit = []
         if not df.empty:
             stages["total"] = len(df)
             for _, r in df.iterrows():
@@ -280,6 +283,20 @@ def get_funnel_stats():
                     stages["rejected"] += 1
                 else:
                     stages["draft"] += 1
+
+            # Extract prepared drafts waiting to be submitted
+            draft_df = df[df["status"].str.lower().isin(["prepared", "draft", "not applied"])].copy()
+            for _, r in draft_df.iterrows():
+                ready_to_submit.append({
+                    "company": str(r.get("company", "") or ""),
+                    "position": str(r.get("position", "") or ""),
+                    "status": str(r.get("status", "prepared") or "prepared"),
+                    "date_applied": str(r.get("date_applied", "") or ""),
+                    "cv_pdf_path": str(r.get("cv_pdf_path", "") or ""),
+                    "cover_pdf_path": str(r.get("cover_pdf_path", "") or ""),
+                    "job_url": str(r.get("job_url", "") or ""),
+                    "notes": str(r.get("notes", "") or ""),
+                })
 
         active_funnel = stages["applied"] + stages["screening"] + stages["interview"] + stages["offer"] + stages["rejected"]
         applied_to_interview = round(((stages["interview"] + stages["offer"]) / max(1, active_funnel)) * 100, 1)
@@ -301,45 +318,135 @@ def get_funnel_stats():
                     except Exception:
                         pass
 
-        top_recommendations = []
+        # DB Engine Metrics & Action Queue
+        total_jobs = 0
+        pending_evaluations = 0
+        total_evaluated = 0
+        total_approved = 0
+        portal_harvest = {}
+        ai_rejections = {}
+        archetype_distribution = {}
+        ready_to_generate = []
+        uncompiled_count = 0
+
         try:
             conn = get_db_connection(DB_PATH)
             cur = conn.cursor()
+
+            # 1. Total jobs
+            cur.execute("SELECT COUNT(*) FROM jobs")
+            row = cur.fetchone()
+            total_jobs = row[0] if row else 0
+
+            # 2. Pending evaluations
+            cur.execute("SELECT COUNT(*) FROM jobs j LEFT JOIN evaluations e ON j.id = e.job_id WHERE e.id IS NULL")
+            row = cur.fetchone()
+            pending_evaluations = row[0] if row else 0
+
+            # 3. Total evaluated & approved
+            cur.execute("SELECT COUNT(*) FROM evaluations")
+            row = cur.fetchone()
+            total_evaluated = row[0] if row else 0
+
+            cur.execute("SELECT COUNT(*) FROM evaluations WHERE status LIKE 'APPROVED%'")
+            row = cur.fetchone()
+            total_approved = row[0] if row else 0
+
+            # 4. Portal distribution from URLs
+            cur.execute("SELECT url FROM jobs WHERE url IS NOT NULL")
+            domains = [urlparse(r[0]).netloc.replace("www.", "") for r in cur.fetchall() if r[0]]
+            portal_map = {
+                "linkedin.com": "LinkedIn",
+                "arbeitsagentur.de": "Bundesagentur",
+                "de.indeed.com": "Indeed",
+                "indeed.com": "Indeed",
+                "xing.com": "Xing",
+                "arbeitnow.com": "Arbeitnow",
+                "arbeitnow.nl": "Arbeitnow",
+                "service.bund.de": "Bund.de",
+                "stepstone.de": "StepStone",
+            }
+            p_counts = Counter()
+            for d in domains:
+                p_counts[portal_map.get(d, "Direct / Company")] += 1
+            portal_harvest = dict(p_counts.most_common(7))
+
+            # 5. AI Rejections breakdown
+            cur.execute("SELECT status, COUNT(*) FROM evaluations WHERE status LIKE 'REJECTED%' GROUP BY status")
+            rej_raw = dict(cur.fetchall())
+            rej_map = {
+                "REJECTED_LANGUAGE": "German B2/C1 Gate",
+                "REJECTED_SENIORITY_EXP": "Seniority / Niche Gate",
+                "REJECTED_TECH_MISMATCH": "Central Tech Mismatch",
+                "REJECTED_STAFFING_AGENCY": "Staffing Agency",
+                "REJECTED_NATIVE_EXCLUSIVE": "Native / Gov Security Gate",
+                "REJECTED_ROLE_MISMATCH": "Role Mismatch",
+            }
+            ai_rejections = {rej_map.get(k, k): v for k, v in rej_raw.items()}
+
+            # 6. Archetype distribution for approved
+            cur.execute("SELECT archetype, COUNT(*) FROM evaluations WHERE status LIKE 'APPROVED%' AND archetype IS NOT NULL GROUP BY archetype")
+            archetype_distribution = dict(cur.fetchall())
+
+            # 7. Uncompiled Approved Jobs (Ready to Generate)
             cur.execute("""
-                SELECT j.id, j.company, j.title, j.url, j.location, e.score, e.archetype, e.matched_skills, e.gaps, j.scraped_at
+                SELECT COUNT(*) FROM jobs j
+                JOIN evaluations e ON j.id = e.job_id
+                LEFT JOIN applications a ON j.id = a.job_id
+                WHERE e.status LIKE 'APPROVED%' AND a.id IS NULL
+            """)
+            row = cur.fetchone()
+            uncompiled_count = row[0] if row else 0
+
+            cur.execute("""
+                SELECT j.id, j.company, j.title, j.location, e.score, e.archetype, e.matched_skills, e.gaps, j.url, j.scraped_at
                 FROM jobs j
                 JOIN evaluations e ON j.id = e.job_id
                 LEFT JOIN applications a ON j.id = a.job_id
-                WHERE a.id IS NULL AND e.status = 'APPROVED' AND e.score >= 70
+                WHERE e.status LIKE 'APPROVED%' AND a.id IS NULL
                 ORDER BY e.score DESC, j.id DESC
-                LIMIT 5
+                LIMIT 30
             """)
-            rows = cur.fetchall()
-            for row in rows:
-                top_recommendations.append({
+            for row in cur.fetchall():
+                ready_to_generate.append({
                     "id": row[0],
                     "company": row[1],
                     "title": row[2],
-                    "url": row[3],
-                    "location": row[4],
-                    "score": row[5],
-                    "archetype": row[6],
-                    "matched_skills": row[7],
-                    "gaps": row[8],
+                    "location": row[3],
+                    "score": row[4],
+                    "archetype": row[5],
+                    "matched_skills": row[6],
+                    "gaps": row[7],
+                    "url": row[8],
                     "scraped_at": row[9],
                 })
             conn.close()
-        except Exception as e_top:
-            logger.warning(f"Failed fetching top recommendations: {e_top}")
+        except Exception as e_engine:
+            logger.warning(f"Engine stats calculation warning: {e_engine}")
 
         return {
+            "counts": {
+                "total_jobs": total_jobs,
+                "pending_evaluations": pending_evaluations,
+                "total_evaluated": total_evaluated,
+                "total_approved": total_approved,
+                "total_applied": stages["applied"],
+                "ready_to_submit_count": len(ready_to_submit),
+                "uncompiled_approved_count": uncompiled_count,
+            },
+            "ready_to_submit": ready_to_submit[:30],
+            "ready_to_generate": ready_to_generate,
+            "portal_harvest": portal_harvest,
+            "ai_rejections": ai_rejections,
+            "archetype_distribution": archetype_distribution,
+            # Backwards compatibility
             "stages": stages,
             "conversions": {
                 "applied_to_interview": applied_to_interview,
                 "interview_to_offer": interview_to_offer,
             },
             "weekly_activity": [{"week": k, **v} for k, v in list(weekly.items())[-6:]],
-            "top_recommendations": top_recommendations,
+            "top_recommendations": ready_to_generate[:5],
         }
     except Exception as e:
         logger.error(f"Failed to calculate funnel stats: {e}")
