@@ -170,12 +170,14 @@ def evaluate_single_job(row: dict, client: genai.Client | None = None, model_nam
             "interview_chance": "LOW",
             "match_score": 0,
             "recommended_doc_language": "GERMAN",
-            "decision_summary": f"Company '{company}' is blacklisted as an aggregator/staffing agency."
+            "decision_summary": f"Company '{company}' is blacklisted as an aggregator/staffing agency.",
+            "_ai_provider": "blacklist"
         }
 
     if getattr(config, "AI_PREFILTER_ENABLED", True):
         pre = prefilter_job(title, description)
         if pre:
+            pre["_ai_provider"] = "prefilter"
             return pre
 
     matcher = ProfileMatcher()
@@ -545,7 +547,7 @@ def run_gemini_matcher_on_db(
         # scraped_at is stored as 'YYYY-MM-DD HH:MM:SS' text on both SQLite and PostgreSQL,
         # so a string comparison against a Python-computed cutoff works on both ('?' is translated for PG).
         cutoff = (datetime.now(GERMAN_TZ) - timedelta(days=max_age_days)).strftime("%Y-%m-%d %H:%M:%S")
-        q += ' AND j.scraped_at IS NOT NULL AND j.scraped_at != "" AND j.scraped_at >= ?'
+        q += " AND j.scraped_at IS NOT NULL AND j.scraped_at != '' AND j.scraped_at >= ?"
         params.append(cutoff)
     q += ' ORDER BY j.id DESC'
 
@@ -575,16 +577,24 @@ def run_gemini_matcher_on_db(
 
     approved_list = []
     rejected_list = []
+    gemini_count = 0
+    fallback_count = 0
+    prefilter_count = 0
+    failed_count = 0
 
     for idx, (_, row) in enumerate(df.iterrows(), 1):
         row_dict = row.to_dict()
         row_dict["job_id"] = row["id"]  # explicitly assign job_id from SQLite primary key
         res = evaluate_single_job(row_dict, client=client, model_name=model_name)
         if not res:
+            failed_count += 1
+            title = str(row_dict.get('title', 'Unknown'))[:40]
+            company = str(row_dict.get('company', 'Unknown'))[:25]
+            print(f"[{idx}/{total_jobs}] ⚠️ {company} - {title}: FAILED_AI_EVALUATION")
             router_status = get_router_status()
             if router_status.get("all_disabled"):
                 msg = (f"All AI providers are disabled (non-retryable errors: {router_status.get('disabled_providers')}). "
-                       f"Aborting matching batch after {idx - 1}/{total_jobs} jobs.")
+                       f"Aborting matching batch after {idx}/{total_jobs} jobs.")
                 logger.error(msg)
                 print(f"⛔ {msg}")
                 try:
@@ -594,6 +604,17 @@ def run_gemini_matcher_on_db(
                     logger.warning(f"Could not send WhatsApp alert for aborted matcher: {e}")
                 break
             continue
+
+        prov = res.get("_ai_provider", "gemini")
+        if prov.startswith("gemini"):
+            gemini_count += 1
+            prov_tag = "Gemini"
+        elif prov in ("prefilter", "blacklist"):
+            prefilter_count += 1
+            prov_tag = "Rule Filter"
+        else:
+            fallback_count += 1
+            prov_tag = f"Fallback: {prov}"
 
         is_approved = res.get("is_approved", False) or str(res.get("status", "")).startswith("APPROVED")
         status = res.get("status", res.get("gemini_status", "REJECTED_TECH_MISMATCH"))
@@ -619,10 +640,10 @@ def run_gemini_matcher_on_db(
         title = str(row_dict.get('title', 'Unknown'))[:40]
         company = str(row_dict.get('company', 'Unknown'))[:25]
         if is_approved or status in ("APPROVED", "MANUAL_REVIEW"):
-            print(f"[{idx}/{total_jobs}] 🟢 {company} - {title}: APPROVED ({score}%)")
+            print(f"[{idx}/{total_jobs}] 🟢 {company} - {title}: APPROVED ({score}%) [{prov_tag}]")
             approved_list.append(enriched_record)
         else:
-            print(f"[{idx}/{total_jobs}] 🔴 {company} - {title}: {status}")
+            print(f"[{idx}/{total_jobs}] 🔴 {company} - {title}: {status} [{prov_tag}]")
             rejected_list.append(enriched_record)
 
         if idx < total_jobs and rate_limit_delay > 0:
@@ -635,11 +656,35 @@ def run_gemini_matcher_on_db(
         save_evaluations_to_db(rejected_list, db_path=db_path)
 
     print(f"\n{'='*60}")
-    print("  AI Job Matching on SQLite Complete")
+    print(f"  AI Job Matching on {db_label} Complete")
     print(f"{'='*60}")
-    print(f"  🟢 Approved Jobs: {len(approved_list):4d}  -> Saved to {db_path}")
-    print(f"  🔴 Disqualified : {len(rejected_list):4d}  -> Saved to {db_path}")
+    print(f"  🟢 Approved Jobs: {len(approved_list):4d}  -> Saved to {db_label}")
+    print(f"  🔴 Disqualified : {len(rejected_list):4d}  -> Saved to {db_label}")
+    print(f"  ------------------------------------------------------------")
+    print(f"  🤖 Routing & Quality Breakdown:")
+    print(f"     • Processed via Gemini      : {gemini_count:4d}")
+    print(f"     • Processed via Fallbacks   : {fallback_count:4d}")
+    print(f"     • Prefiltered (Rule/Agency) : {prefilter_count:4d}")
+    if failed_count > 0:
+        print(f"     • ⚠️ Failed (Not evaluated)  : {failed_count:4d}")
     print(f"{'='*60}\n")
+
+    if fallback_count > 0 or failed_count > 0:
+        alert_msg = (
+            f"⚠️ *AI Matcher Quality Notice*\n\n"
+            f"Processed {total_jobs} pending jobs on {db_label}.\n"
+            f"• Gemini: {gemini_count}\n"
+        )
+        if fallback_count > 0:
+            alert_msg += f"• Fallback (Groq/OpenRouter): {fallback_count} (Gemini timed out or rate-limited)\n"
+        if failed_count > 0:
+            alert_msg += f"• ⚠️ FAILED completely: {failed_count} jobs could not be evaluated\n"
+        logger.warning(alert_msg)
+        try:
+            from src.core.notifier import send_whatsapp_alert
+            send_whatsapp_alert(alert_msg)
+        except Exception as e:
+            logger.warning(f"Could not send WhatsApp alert: {e}")
 
     return approved_list
 

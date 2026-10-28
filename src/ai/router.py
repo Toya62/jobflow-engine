@@ -42,6 +42,7 @@ class AIRouter:
         # Maps a provider ("groq") or provider/model ("groq/openai/gpt-oss-120b") to the reason it was disabled.
         self.disabled: Dict[str, str] = {}
         self._dead_gemini_keys: set = set()
+        self.last_provider_used: str = "gemini"
 
     def _is_disabled(self, provider: str, model: Optional[str] = None) -> bool:
         return provider in self.disabled or (model is not None and f"{provider}/{model}" in self.disabled)
@@ -173,6 +174,7 @@ class AIRouter:
                         result = self._call_gemini(prompt, model=model, key=key, schema=schema)
                         if result:
                             self.gemini_consecutive_failures = 0
+                            self.last_provider_used = f"gemini ({model})"
                             return result
                     except Exception as e:
                         errors.append(f"Gemini({model}) error: {str(e)}")
@@ -200,6 +202,7 @@ class AIRouter:
                 try:
                     result = self._call_groq(prompt, model=model, key=groq_key)
                     if result:
+                        self.last_provider_used = f"groq ({model})"
                         logger.info(f"Successfully generated response using Groq fallback ({model})")
                         return result
                 except Exception as e:
@@ -218,6 +221,7 @@ class AIRouter:
             try:
                 result = self._call_openrouter(prompt, key=or_key)
                 if result:
+                    self.last_provider_used = "openrouter"
                     logger.info("Successfully generated response using OpenRouter fallback")
                     return result
             except Exception as e:
@@ -355,7 +359,10 @@ def route_ai_evaluation(system_prompt: str, user_prompt: str, preferred_model: O
         # Strip trailing commas before closing braces/brackets
         cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
 
-        return json.loads(cleaned)
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            parsed["_ai_provider"] = getattr(router, "last_provider_used", "gemini")
+        return parsed
     except Exception as e:
         logger.error(f"Error in route_ai_evaluation: {e}")
         return None
