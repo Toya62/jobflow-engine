@@ -384,8 +384,14 @@ def get_funnel_stats():
             }
             ai_rejections = {rej_map.get(k, k): v for k, v in rej_raw.items()}
 
-            # 6. Archetype distribution for approved
-            cur.execute("SELECT archetype, COUNT(*) FROM evaluations WHERE status LIKE 'APPROVED%' AND archetype IS NOT NULL GROUP BY archetype")
+            # 6. Archetype distribution for approved (normalize case to lowercase)
+            cur.execute("""
+                SELECT LOWER(archetype) AS arch, COUNT(*) 
+                FROM evaluations 
+                WHERE status LIKE 'APPROVED%' AND archetype IS NOT NULL AND archetype != '' 
+                GROUP BY LOWER(archetype)
+                ORDER BY COUNT(*) DESC
+            """)
             archetype_distribution = dict(cur.fetchall())
 
             # 7. Uncompiled Approved Jobs (Ready to Generate)

@@ -66,9 +66,20 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
   const aiRejections = stats.ai_rejections || {};
   const archetypeDist = stats.archetype_distribution || {};
 
+  // Aggregate and deduplicate archetypes by display label, sorted descending
+  const aggregatedArchetypes: Record<string, number> = {};
+  for (const [arch, count] of Object.entries(archetypeDist)) {
+    const label = formatArchetype(arch);
+    aggregatedArchetypes[label] = (aggregatedArchetypes[label] || 0) + count;
+  }
+  const sortedArchetypes = Object.entries(aggregatedArchetypes).sort((a, b) => b[1] - a[1]);
+
+  const sortedPortals = Object.entries(portalHarvest).sort((a, b) => b[1] - a[1]);
+  const sortedRejections = Object.entries(aiRejections).sort((a, b) => b[1] - a[1]);
+
   const totalPortals = Object.values(portalHarvest).reduce((a, b) => a + b, 0) || 1;
   const totalRejections = Object.values(aiRejections).reduce((a, b) => a + b, 0) || 1;
-  const totalArchetypes = Object.values(archetypeDist).reduce((a, b) => a + b, 0) || 1;
+  const totalArchetypes = Object.values(aggregatedArchetypes).reduce((a, b) => a + b, 0) || 1;
 
   container.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
@@ -133,7 +144,7 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
             <span style="font-size:0.75rem;color:var(--text-muted);">${counts.total_jobs.toLocaleString()} jobs</span>
           </div>
           <div class="kjc-engine-bars">
-            ${Object.entries(portalHarvest)
+            ${sortedPortals
               .map(([portal, count]) => {
                 const pct = Math.round((count / totalPortals) * 100);
                 return `
@@ -159,7 +170,7 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
             <span style="font-size:0.75rem;color:var(--text-muted);">Strict Profile Guards</span>
           </div>
           <div class="kjc-engine-bars">
-            ${Object.entries(aiRejections)
+            ${sortedRejections
               .slice(0, 6)
               .map(([gate, count]) => {
                 const pct = Math.round((count / totalRejections) * 100);
@@ -186,13 +197,13 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
             <span style="font-size:0.75rem;color:var(--text-muted);">${counts.total_approved.toLocaleString()} approved</span>
           </div>
           <div class="kjc-engine-bars">
-            ${Object.entries(archetypeDist)
-              .map(([arch, count]) => {
+            ${sortedArchetypes
+              .map(([label, count]) => {
                 const pct = Math.round((count / totalArchetypes) * 100);
                 return `
                 <div class="kjc-bar-row">
                   <div class="kjc-bar-meta">
-                    <span class="kjc-bar-name">${formatArchetype(arch)}</span>
+                    <span class="kjc-bar-name">${escapeHtml(label)}</span>
                     <span class="kjc-bar-val">${count.toLocaleString()} (${pct}%)</span>
                   </div>
                   <div class="kjc-bar-track">
