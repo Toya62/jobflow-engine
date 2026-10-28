@@ -646,6 +646,12 @@ def run_gemini_matcher_on_db(
             print(f"[{idx}/{total_jobs}] 🔴 {company} - {title}: {status} [{prov_tag}]")
             rejected_list.append(enriched_record)
 
+        # Persist immediately to DB so pending counts and other processes reflect real-time progress
+        try:
+            save_evaluations_to_db([enriched_record], db_path=db_path)
+        except Exception as e:
+            logger.error(f"Failed to save real-time evaluation for job {row_dict.get('job_id')}: {e}")
+
         if idx < total_jobs and rate_limit_delay > 0:
             time.sleep(rate_limit_delay)
 

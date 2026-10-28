@@ -316,3 +316,64 @@ def test_error_responses_are_json(dashboard):
     assert response.status_code == 404
     assert "error" in response.json()
     assert json.dumps(response.json())  # serializable
+
+
+def test_dashboard_matcher_endpoints(dashboard, tmp_path):
+    """Verify /api/matcher-status, /api/matcher-logs, and /api/stop-matcher."""
+    log_file = tmp_path / "data" / "matcher_run.log"
+    if log_file.exists():
+        log_file.unlink()
+
+    status_resp = dashboard.get("/api/matcher-status")
+    assert status_resp.status_code == 200
+    assert status_resp.json() == {"running": False, "exit_code": None}
+
+    logs_resp = dashboard.get("/api/matcher-logs")
+    assert logs_resp.status_code == 200
+    assert logs_resp.json()["success"] is True
+
+    log_file.write_text("Evaluating 5 jobs\nJob 1: APPROVED\nMatching complete\n", encoding="utf-8")
+    logs_resp2 = dashboard.get("/api/matcher-logs")
+    assert logs_resp2.status_code == 200
+    data = logs_resp2.json()
+    assert data["success"] is True
+    assert "Matching complete" in data["logs"]
+
+
+def test_scraper_and_matcher_concurrency(dashboard, monkeypatch):
+    """Verify that running a scraper does not block the matcher, and vice versa."""
+    class FakeProc:
+        def __init__(self):
+            self.killed = False
+        def poll(self):
+            return None
+        def kill(self):
+            self.killed = True
+
+    try:
+        # 1. Scraper is running; matcher should still be allowed to run
+        state.SCRAPER_PROCESS = FakeProc()
+        state.MATCHER_PROCESS = None
+
+        # Verify stop_matcher works when idle
+        stop_resp = dashboard.post("/api/stop-matcher")
+        assert stop_resp.status_code == 200
+        assert stop_resp.json()["success"] is True
+
+        # Verify matcher is not blocked by running scraper
+        monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakeProc())
+        run_resp = dashboard.post("/api/run-matcher", json={"max_age_days": 1})
+        assert run_resp.status_code == 200
+        assert run_resp.json()["success"] is True
+
+        # Now both are fake-running
+        assert state.SCRAPER_PROCESS is not None
+        assert state.MATCHER_PROCESS is not None
+
+        # Stopping matcher does not touch scraper
+        dashboard.post("/api/stop-matcher")
+        assert state.MATCHER_PROCESS is None
+        assert state.SCRAPER_PROCESS is not None
+    finally:
+        state.SCRAPER_PROCESS = None
+        state.MATCHER_PROCESS = None

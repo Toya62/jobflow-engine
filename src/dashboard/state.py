@@ -22,6 +22,10 @@ APP_GEN_STATUS: dict = {}
 SCRAPER_STATUS: dict = {"running": False, "message": "Idle", "error": None}
 #: The live scraper :class:`subprocess.Popen` handle, or ``None``.
 SCRAPER_PROCESS = None
+#: Current AI matcher subprocess bookkeeping.
+MATCHER_STATUS: dict = {"running": False, "message": "Idle", "error": None}
+#: The live matcher :class:`subprocess.Popen` handle, or ``None``.
+MATCHER_PROCESS = None
 
 
 def set_desc_cache(url: str, desc: str) -> None:

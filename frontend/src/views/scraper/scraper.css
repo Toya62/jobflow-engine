@@ -12,6 +12,11 @@
 .kjs-dot.unknown { background: #c9a15f; }
 .kjs-message { min-height: 1.25rem; font-size: 0.85rem; }
 .kjs-message.error { color: #ef4444; }
-.kjs-log { margin: 0; padding: 0.75rem; height: 55vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 0.8rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(0, 0, 0, 0.35); }
+.kjs-state-group { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.kjs-log-tabs { display: flex; gap: 0.35rem; align-items: center; margin-top: 0.25rem; }
+.kjs-tab-btn { padding: 0.4rem 0.85rem; border-radius: 6px 6px 0 0; border: 1px solid rgba(255, 255, 255, 0.15); border-bottom: none; background: rgba(255, 255, 255, 0.04); color: inherit; font-size: 0.8rem; cursor: pointer; transition: background 0.15s ease; }
+.kjs-tab-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.kjs-tab-btn.active { background: rgba(255, 255, 255, 0.14); font-weight: 600; border-color: rgba(255, 255, 255, 0.3); }
+.kjs-log { margin: 0; padding: 0.75rem; height: 55vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 0.8rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border-radius: 0 8px 8px 8px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(0, 0, 0, 0.35); }
 @keyframes kjs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .kjs-dot.running { animation: none; } }

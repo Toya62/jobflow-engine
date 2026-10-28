@@ -145,6 +145,152 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
     return {"scraped": scraped_count, "approved": approved_count}
 
 
+def _run_all_portals_pipelined(p_configs, auto_ai=True):
+    """Run all portal scrapers while concurrently evaluating pending jobs via Gemini in background."""
+    import threading
+    from src.db.database import get_db_connection, is_postgres
+    from src.config import AUTO_MATCH_MAX_AGE_DAYS
+    from datetime import datetime, timedelta
+    from src.core.utils import GERMAN_TZ
+
+    print(f"\n{'='*60}")
+    print(f"  ⚡ Concurrent Pipelined Execution: Scrapers + AI Matcher")
+    print(f"{'='*60}\n")
+
+    portal_breakdown = {}
+    db_path = "data/karriere.db"
+    stop_event = threading.Event()
+    newly_approved_jobs = []
+
+    def _count_pending_jobs():
+        if not (is_postgres() or os.path.exists(db_path)):
+            return 0
+        try:
+            conn = get_db_connection(db_path)
+            cutoff = (datetime.now(GERMAN_TZ) - timedelta(days=AUTO_MATCH_MAX_AGE_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM jobs j
+                LEFT JOIN evaluations e ON j.id = e.job_id
+                WHERE e.id IS NULL AND length(j.description) > 30
+                AND j.scraped_at IS NOT NULL AND j.scraped_at != '' AND j.scraped_at >= ?
+                """,
+                (cutoff,),
+            )
+            row = cur.fetchone()
+            conn.close()
+            return row[0] if row else 0
+        except Exception:
+            return 0
+
+    def _ai_consumer_worker():
+        from src.ai.matcher import run_gemini_matcher_on_db
+        while not stop_event.is_set():
+            pending = _count_pending_jobs()
+            if pending > 0:
+                print(f"\n[AI Pipeline] 🚀 {pending} pending jobs detected in DB. Evaluating concurrently...")
+                try:
+                    approved = run_gemini_matcher_on_db(
+                        db_path=db_path,
+                        max_age_days=AUTO_MATCH_MAX_AGE_DAYS,
+                    )
+                    if approved:
+                        newly_approved_jobs.extend(approved)
+                except Exception as e:
+                    print(f"[AI Pipeline Error] {e}", file=sys.stderr)
+            stop_event.wait(timeout=3.0)
+
+        # Final drain sweep after all scrapers complete
+        pending = _count_pending_jobs()
+        if pending > 0:
+            print(f"\n[AI Pipeline] 🏁 Final sweep: evaluating remaining {pending} pending jobs...")
+            try:
+                approved = run_gemini_matcher_on_db(
+                    db_path=db_path,
+                    max_age_days=AUTO_MATCH_MAX_AGE_DAYS,
+                )
+                if approved:
+                    newly_approved_jobs.extend(approved)
+            except Exception as e:
+                print(f"[AI Pipeline Error] {e}", file=sys.stderr)
+
+    ai_thread = threading.Thread(target=_ai_consumer_worker, daemon=True, name="AIConsumerThread")
+    ai_thread.start()
+
+    try:
+        for p_name, p_func in p_configs:
+            prev_max_id = 0
+            if is_postgres() or os.path.exists(db_path):
+                try:
+                    conn = get_db_connection(db_path)
+                    row = conn.cursor().execute("SELECT COALESCE(MAX(id), 0) FROM jobs").fetchone()
+                    prev_max_id = row[0] if row else 0
+                    conn.close()
+                except Exception as e:
+                    print(f"[Warning] Failed to fetch prev_max_id: {e}", file=sys.stderr)
+
+            print(f"\n{'='*60}")
+            print(f"  🌐 [Scraping Portal] {p_name}")
+            print(f"{'='*60}\n")
+
+            scraped_count = 0
+            err = None
+            try:
+                p_func()
+            except Exception as e:
+                print(f"[ERROR] Failed scraping {p_name}: {e}", file=sys.stderr)
+                err = str(e)
+                try:
+                    from src.core.notifier import send_whatsapp_alert
+                    send_whatsapp_alert(f"⚠️ *Scraper Error on {p_name}*\n\nError: {e}\nCheck run logs for details.")
+                except Exception:
+                    pass
+
+            if is_postgres() or os.path.exists(db_path):
+                try:
+                    conn = get_db_connection(db_path)
+                    row = conn.cursor().execute("SELECT COUNT(*) FROM jobs WHERE id > ?", (prev_max_id,)).fetchone()
+                    scraped_count = row[0] if row else 0
+                    conn.close()
+                except Exception as e:
+                    print(f"[Warning] Failed to count new jobs: {e}", file=sys.stderr)
+
+            print(f"✓ {p_name}: Scraped {scraped_count} fresh jobs.")
+            portal_breakdown[p_name] = {"scraped": scraped_count, "approved": 0, "error": err}
+    finally:
+        print(f"\n{'='*60}")
+        print("  ⏳ All scrapers completed. Waiting for AI Matcher to finish evaluating all jobs...")
+        print(f"{'='*60}\n")
+        stop_event.set()
+        ai_thread.join()
+
+    # Tally approved per portal from newly_approved_jobs
+    if newly_approved_jobs:
+        for app_job in newly_approved_jobs:
+            url = str(app_job.get("url") or app_job.get("job_url", "")).lower()
+            matched_portal = None
+            if "linkedin" in url or "licdn" in url:
+                matched_portal = "LinkedIn"
+            elif "indeed" in url:
+                matched_portal = "Indeed"
+            elif "arbeitsagentur" in url:
+                matched_portal = "Bundesagentur"
+            elif "bund" in url or "interamt" in url:
+                matched_portal = "Bund.de"
+            elif "xing" in url:
+                matched_portal = "XING"
+            elif "personio" in url:
+                matched_portal = "Personio"
+            elif "arbeitnow" in url:
+                matched_portal = "Arbeitnow"
+
+            if matched_portal and matched_portal in portal_breakdown:
+                portal_breakdown[matched_portal]["approved"] += 1
+
+    return portal_breakdown
+
+
 def handle_scrape(args):
     if hasattr(args, "days") and args.days:
         os.environ["SCRAPE_WINDOW"] = f"{args.days}d"
@@ -193,9 +339,12 @@ def handle_scrape(args):
             ("Arbeitnow", run_scrape_arbeitnow),
         ]
 
-        for p_name, p_func in p_configs:
-            stats = _run_portal_and_ai(p_name, p_func, auto_ai=auto_ai)
-            portal_breakdown[p_name] = stats
+        if auto_ai:
+            portal_breakdown = _run_all_portals_pipelined(p_configs, auto_ai=True)
+        else:
+            for p_name, p_func in p_configs:
+                stats = _run_portal_and_ai(p_name, p_func, auto_ai=False)
+                portal_breakdown[p_name] = stats
 
         print(f"\n{'='*60}")
         print("  🎉 All portals scraped and evaluated successfully!")

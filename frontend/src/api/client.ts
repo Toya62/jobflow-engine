@@ -90,6 +90,9 @@ export const api = {
   scraperLogs: () => request<unknown>("/api/scraper-logs"),
   runMatcher: (body?: { max_age_days?: number; portal?: string }) =>
     request<{ success: boolean; message: string }>("/api/run-matcher", {}, "POST", body ?? {}),
+  stopMatcher: () => request<unknown>("/api/stop-matcher", {}, "POST"),
+  matcherStatus: () => request<unknown>("/api/matcher-status"),
+  matcherLogs: () => request<unknown>("/api/matcher-logs"),
   pendingMatches: (max_age_days: number = 2) =>
     request<{ pending_count: number; max_age_days: number }>("/api/pending-matches", { max_age_days }),
   sync: () => request<unknown>("/api/sync"),

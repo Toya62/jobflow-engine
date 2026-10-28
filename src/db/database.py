@@ -188,7 +188,7 @@ def get_db_connection(db_path: str | os.PathLike[str] = DB_PATH):
     parent_dir = os.path.dirname(db_path)
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=30.0)
     return conn
 
 
@@ -241,6 +241,10 @@ def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
         return conn
 
     # SQLite
+    try:
+        cursor.execute("PRAGMA journal_mode = WAL;")
+    except Exception:
+        pass
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS jobs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

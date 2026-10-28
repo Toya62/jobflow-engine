@@ -24,6 +24,13 @@ def _scraper_log_path() -> str:
     return log_path
 
 
+def _matcher_log_path() -> str:
+    log_path = os.path.join('data', 'matcher_run.log')
+    if not os.path.exists(log_path):
+        log_path = os.path.join(git_root(), 'data', 'matcher_run.log')
+    return log_path
+
+
 @router.get("/scraper-status")
 @router.get("/scraper/status", include_in_schema=False)
 def scraper_status():
@@ -50,6 +57,40 @@ def scraper_logs():
     log_path = _scraper_log_path()
     if not os.path.exists(log_path):
         return {"success": True, "logs": "No scraper log file found yet.", "total_lines": 0}
+    try:
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+            last_lines = "".join(lines[-300:])
+        return {"success": True, "logs": last_lines, "total_lines": len(lines)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/matcher-status")
+@router.get("/matcher/status", include_in_schema=False)
+def matcher_status():
+    """Report whether the local AI matcher subprocess is still running."""
+    is_running = False
+    exit_code = None
+    proc = state.MATCHER_PROCESS
+    if proc is not None:
+        poll = proc.poll()
+        if poll is None:
+            is_running = True
+        else:
+            exit_code = poll
+            state.CACHE["jobs"] = {}
+            state.MATCHER_PROCESS = None
+    return {"running": is_running, "exit_code": exit_code}
+
+
+@router.get("/matcher-logs")
+@router.get("/matcher/logs", include_in_schema=False)
+def matcher_logs():
+    """Return the tail of the local AI matcher log, if present."""
+    log_path = _matcher_log_path()
+    if not os.path.exists(log_path):
+        return {"success": True, "logs": "No AI matcher log file found yet.", "total_lines": 0}
     try:
         with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
@@ -122,19 +163,37 @@ def stop_scraper():
     return {"success": True, "message": "No active scraper process running."}
 
 
+@router.post("/stop-matcher")
+def stop_matcher():
+    """Terminate the running AI matcher subprocess, if any."""
+    proc = state.MATCHER_PROCESS
+    if proc and proc.poll() is None:
+        try:
+            proc.kill()
+            state.MATCHER_PROCESS = None
+            state.MATCHER_STATUS["running"] = False
+            state.MATCHER_STATUS["message"] = "AI Matcher stopped by user."
+            state.MATCHER_STATUS["error"] = "Terminated by user."
+            return {"success": True, "message": "AI Matcher process terminated."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    state.MATCHER_STATUS["running"] = False
+    return {"success": True, "message": "No active AI matcher process running."}
+
+
 @router.post("/run-matcher")
 def run_matcher(body: MatcherRunRequest = None):
-    """Spawn the local AI matcher subprocess (sharing the scraper log)."""
+    """Spawn the local AI matcher subprocess with independent log."""
     max_age = str(body.max_age_days if body and body.max_age_days is not None else 2)
     portal = body.portal if body and body.portal else None
 
     try:
-        if state.SCRAPER_PROCESS is not None and state.SCRAPER_PROCESS.poll() is None:
+        if state.MATCHER_PROCESS is not None and state.MATCHER_PROCESS.poll() is None:
             return JSONResponse(
                 status_code=400,
                 content={
                     "success": False,
-                    "error": "A process (scraper or matcher) is already running. Please wait or stop it first.",
+                    "error": "An AI matcher process is already running. Please wait or stop it first.",
                 },
             )
 
@@ -147,10 +206,10 @@ def run_matcher(body: MatcherRunRequest = None):
 
         reap_zombies()
         logger.info(f"Launching AI matcher: {' '.join(cmd)}")
-        log_path = os.path.join(root_dir, 'data', 'scraper_run.log')
+        log_path = os.path.join(root_dir, 'data', 'matcher_run.log')
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         log_file = open(log_path, 'w', encoding='utf-8')
-        state.SCRAPER_PROCESS = subprocess.Popen(
+        state.MATCHER_PROCESS = subprocess.Popen(
             cmd,
             cwd=root_dir,
             stdout=log_file,
