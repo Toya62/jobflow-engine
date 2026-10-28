@@ -24,24 +24,26 @@ export interface Drawer {
   close(): void;
 }
 
-function metaRow(label: string, value: string): string {
-  return `<div class="kjc-drawer-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-}
-
 export function createDrawer(): Drawer {
-  const element = document.createElement("aside");
+  const element = document.createElement("div");
   element.className = "kjc-drawer hidden";
   element.innerHTML = `
     <div class="kjc-drawer-backdrop" data-role="backdrop"></div>
     <div class="kjc-drawer-panel" role="dialog" aria-modal="true" aria-label="Job details">
       <div class="kjc-drawer-head">
-        <h2 data-role="title"></h2>
-        <button type="button" class="kjc-icon-btn" data-role="close" aria-label="Close">✕</button>
+        <div class="kjc-modal-title-group">
+          <div class="kjc-modal-company" data-role="company"></div>
+          <h2 class="kjc-modal-title" data-role="title"></h2>
+          <div class="kjc-modal-badges" data-role="badges"></div>
+        </div>
+        <button type="button" class="kjc-drawer-close-btn" data-role="close" aria-label="Close dialog">✕</button>
       </div>
       <div class="kjc-drawer-body" data-role="body"></div>
     </div>`;
 
   const titleEl = element.querySelector<HTMLElement>('[data-role="title"]');
+  const companyEl = element.querySelector<HTMLElement>('[data-role="company"]');
+  const badgesEl = element.querySelector<HTMLElement>('[data-role="badges"]');
   const bodyEl = element.querySelector<HTMLElement>('[data-role="body"]');
   let openToken = 0;
 
@@ -78,28 +80,73 @@ export function createDrawer(): Drawer {
   const open = (job: JobRecord): void => {
     openToken += 1;
     const token = openToken;
-    if (titleEl) titleEl.textContent = String(job.title ?? "");
+    const title = String(job.title ?? "Job Posting");
+    const company = String(job.company ?? "Company");
+    const location = String(job.location ?? "Germany / Remote");
+    const score = Number(job.score ?? 0);
+    const arch = String((job as any).target_archetype || (job as any).archetype || "");
+    const dateStr = jobDate(job) || "Recent";
+
+    if (titleEl) titleEl.textContent = title;
+    if (companyEl) companyEl.textContent = company;
+
+    if (badgesEl) {
+      badgesEl.innerHTML = `
+        ${score > 0 ? `<span class="kjc-score-chip">${score}% Match</span>` : ""}
+        ${arch ? `<span class="kjc-arch-chip ${escapeHtml(arch.toLowerCase())}">${escapeHtml(formatArchetype(arch))}</span>` : ""}
+        <span class="kjc-meta-pill">📍 ${escapeHtml(location)}</span>
+        <span class="kjc-meta-pill">📅 ${escapeHtml(dateStr)}</span>
+      `;
+    }
+
     if (bodyEl) {
       const existing = String(job.description ?? "").trim();
-      const link = job.job_url
-        ? `<a class="kjc-btn" href="${escapeHtml(job.job_url)}" target="_blank" rel="noopener noreferrer">Open posting ↗</a>`
+      const matchedSkillsRaw = (job as any).matched_skills || (job as any).gemini_matched_skills || "";
+      const matchedSkills = typeof matchedSkillsRaw === "string" && matchedSkillsRaw
+        ? matchedSkillsRaw.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      const gaps = (job as any).gemini_gaps || (job as any).gaps || "";
+      const portalLink = job.job_url
+        ? `<a class="kjc-btn" href="${escapeHtml(job.job_url)}" target="_blank" rel="noopener noreferrer">↗ Open Portal</a>`
         : "";
+
       bodyEl.innerHTML = `
-        <div class="kjc-drawer-actions" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border-color);">
-          <button type="button" class="kjc-btn kjc-btn-primary" data-role="generate">Generate CV &amp; Cover</button>
-          <button type="button" class="kjc-btn" data-role="draft-email" style="font-weight:600;">✉️ Draft Email</button>
-          ${link}
+        <div class="kjc-modal-action-bar">
+          <button type="button" class="kjc-btn kjc-btn-primary" data-role="generate">
+            ⚡ 1-Click Generate Application
+          </button>
+          <button type="button" class="kjc-btn" data-role="draft-email" style="font-weight:600;">
+            ✉️ Draft Recruiter Email
+          </button>
+          ${portalLink}
+          <button type="button" class="kjc-btn" data-role="copy-desc" ${existing ? "" : "disabled"}>
+            📋 ${existing ? "Copy Description" : "Loading…"}
+          </button>
         </div>
-        <div class="kjc-drawer-meta">
-          ${metaRow("Company", String(job.company ?? ""))}
-          ${metaRow("Location", String(job.location ?? "—"))}
-          ${metaRow("AI Fit", String(job.score ?? 0))}
-          ${metaRow("Date", jobDate(job) || "—")}
-        </div>
-        <div class="kjc-desc-wrap">
-          <div class="kjc-desc-head">
-            <h3>Job Description</h3>
-            <button type="button" class="kjc-btn kjc-btn-sm" data-role="copy-desc" ${existing ? "" : "disabled"}>${existing ? "Copy" : "Loading…"}</button>
+
+        ${matchedSkills.length > 0 || gaps ? `
+          <div class="kjc-modal-card kjc-match-card">
+            <div class="kjc-card-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Verified Match Analysis (AGENTS.md)
+            </div>
+            ${matchedSkills.length > 0 ? `
+              <div class="kjc-skill-chips-wrap">
+                ${matchedSkills.map((s: string) => `<span class="kjc-skill-tag">✓ ${escapeHtml(s)}</span>`).join("")}
+              </div>
+            ` : ""}
+            ${gaps ? `
+              <div class="kjc-gaps-block">
+                <strong>Adjacent / Growth Topics:</strong> ${escapeHtml(gaps)}
+              </div>
+            ` : ""}
+          </div>
+        ` : ""}
+
+        <div class="kjc-modal-card">
+          <div class="kjc-card-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Job Description
           </div>
           <pre class="kjc-drawer-desc" data-role="desc">${
             existing ? escapeHtml(existing) : "Loading description…"
@@ -184,4 +231,13 @@ export function createDrawer(): Drawer {
   };
 
   return { element, open, close };
+}
+
+function formatArchetype(arch: string): string {
+  const norm = arch.toLowerCase();
+  if (norm.includes("cpp")) return "C++ / Automotive";
+  if (norm.includes("backend")) return "Python Backend";
+  if (norm.includes("data")) return "Data & PyFlink";
+  if (norm.includes("devsecops")) return "DevSecOps & Cloud";
+  return arch.replace(/_/g, " ");
 }

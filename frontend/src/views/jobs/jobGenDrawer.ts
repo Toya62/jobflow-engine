@@ -47,8 +47,8 @@ export function createJobGenDrawer(): JobGenDrawer {
     <div class="kjc-drawer-backdrop" data-role="backdrop"></div>
     <div class="kjc-drawer-panel" role="dialog" aria-modal="true" aria-label="Generate Application">
       <div class="kjc-drawer-head">
-        <h2 data-role="title">Generate Application</h2>
-        <button type="button" class="kjc-icon-btn" data-role="close" aria-label="Close">✕</button>
+        <h2 data-role="title" style="font-size:1.15rem; font-weight:700;">Generate Application</h2>
+        <button type="button" class="kjc-drawer-close-btn" data-role="close" aria-label="Close">✕</button>
       </div>
       <div class="kjc-drawer-tabs" data-role="tabs" style="display:flex; gap:6px; padding:8px 20px 0; border-bottom:1px solid var(--border-color); background:var(--bg-card);">
         <button type="button" class="kjc-tab-btn active" data-tab="application" style="padding:10px 16px; background:none; border:none; border-bottom:2px solid var(--accent-brass, #e6a84f); color:var(--text-primary); cursor:pointer; font-weight:600; font-size:0.9rem;">📄 Application</button>

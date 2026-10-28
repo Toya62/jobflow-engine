@@ -21,25 +21,27 @@ export interface CrmDrawer {
   close(): void;
 }
 
-function metaRow(label: string, value: string): string {
-  return `<div class="kjc-drawer-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-}
-
 export function createCrmDrawer(): CrmDrawer {
-  const element = document.createElement("aside");
+  const element = document.createElement("div");
   element.className = "kjc-drawer hidden";
 
   element.innerHTML = `
     <div class="kjc-drawer-backdrop" data-role="backdrop"></div>
-    <div class="kjc-drawer-panel" role="dialog" aria-modal="true" aria-label="Job details">
+    <div class="kjc-drawer-panel" role="dialog" aria-modal="true" aria-label="Application details">
       <div class="kjc-drawer-head">
-        <h2 data-role="title"></h2>
-        <button type="button" class="kjc-icon-btn" data-role="close" aria-label="Close">✕</button>
+        <div class="kjc-modal-title-group">
+          <div class="kjc-modal-company" data-role="company"></div>
+          <h2 class="kjc-modal-title" data-role="title"></h2>
+          <div class="kjc-modal-badges" data-role="badges"></div>
+        </div>
+        <button type="button" class="kjc-drawer-close-btn" data-role="close" aria-label="Close dialog">✕</button>
       </div>
       <div class="kjc-drawer-body" data-role="body"></div>
     </div>`;
 
   const titleEl = element.querySelector<HTMLElement>('[data-role="title"]');
+  const companyEl = element.querySelector<HTMLElement>('[data-role="company"]');
+  const badgesEl = element.querySelector<HTMLElement>('[data-role="badges"]');
   const bodyEl = element.querySelector<HTMLElement>('[data-role="body"]');
   let openToken = 0;
 
@@ -76,30 +78,45 @@ export function createCrmDrawer(): CrmDrawer {
   const open = (record: TrackerRecord): void => {
     openToken += 1;
     const token = openToken;
-    if (titleEl) titleEl.textContent = `${record.company} — ${record.position}`;
+    if (titleEl) titleEl.textContent = String(record.position ?? "Application");
+    if (companyEl) companyEl.textContent = String(record.company ?? "Company");
+    if (badgesEl) {
+      badgesEl.innerHTML = `
+        <span class="kjc-status-chip">${escapeHtml(record.status || "Prepared")}</span>
+        <span class="kjc-meta-pill">📍 ${escapeHtml(record.location || "Germany")}</span>
+        <span class="kjc-meta-pill">📅 Applied: ${escapeHtml(record.date_applied || "Recent")}</span>
+      `;
+    }
     if (bodyEl) {
       const existing = String(record.description ?? "").trim();
+      const cvLink = record.cv_pdf_path
+        ? `<a class="kjc-btn kjc-btn-primary" href="/${escapeHtml(record.cv_pdf_path)}" target="_blank">📄 Open CV PDF ↗</a>`
+        : "";
+      const clLink = record.cover_pdf_path
+        ? `<a class="kjc-btn" href="/${escapeHtml(record.cover_pdf_path)}" target="_blank">📝 Open Cover Letter ↗</a>`
+        : "";
+      const jobUrlLink = record.job_url
+        ? `<a class="kjc-btn" href="${escapeHtml(record.job_url)}" target="_blank" rel="noopener noreferrer">↗ Open Portal</a>`
+        : "";
+
       bodyEl.innerHTML = `
-        <div class="kjc-drawer-actions" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border-color);">
-          <button type="button" class="kjc-btn kjc-btn-primary" data-role="generate">Generate CV &amp; Cover</button>
-          <button type="button" class="kjc-btn" data-role="email" style="font-weight:600;">✉️ Draft Email</button>
-          <button type="button" class="kjc-btn" data-role="close2">Close</button>
+        <div class="kjc-modal-action-bar">
+          ${cvLink}
+          ${clLink}
+          <button type="button" class="kjc-btn" data-role="generate">⚡ Re-Generate Files</button>
+          <button type="button" class="kjc-btn" data-role="email">✉️ Draft Recruiter Email</button>
+          ${jobUrlLink}
+          <button type="button" class="kjc-btn" data-role="copy-desc" ${existing ? "" : "disabled"}>
+            📋 ${existing ? "Copy Description" : "Loading…"}
+          </button>
         </div>
-        <div class="kjc-drawer-meta">
-          ${metaRow("Company", String(record.company ?? ""))}
-          ${metaRow("Position", String(record.position ?? ""))}
-          ${metaRow("Status", String(record.status || "Prepared"))}
-          ${metaRow("Location", String(record.location || "—"))}
-          ${record.job_url ? metaRow("URL", "") + `<div class="kjc-drawer-url"><a href="${escapeHtml(record.job_url)}" target="_blank" rel="noopener noreferrer">Open job posting ↗</a></div>` : ""}
-        </div>
-        <div class="kjc-desc-wrap">
-          <div class="kjc-desc-head">
-            <h3>Job Description</h3>
-            <button type="button" class="kjc-btn kjc-btn-sm" data-role="copy-desc" ${existing ? "" : "disabled"}>${existing ? "Copy" : "Loading…"}</button>
+
+        <div class="kjc-modal-card">
+          <div class="kjc-card-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Job Description
           </div>
-          <pre class="kjc-drawer-desc" data-role="desc">${
-            existing ? escapeHtml(existing) : "Loading description…"
-          }</pre>
+          <pre class="kjc-drawer-desc" data-role="desc">${existing ? escapeHtml(existing) : "Loading description…"}</pre>
         </div>`;
 
       const copyBtn = bodyEl.querySelector<HTMLButtonElement>("[data-role='copy-desc']");
