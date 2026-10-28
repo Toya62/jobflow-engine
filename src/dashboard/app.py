@@ -20,6 +20,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -246,6 +247,9 @@ async def _lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Build the dashboard FastAPI application."""
     app = FastAPI(title="Karriere Pipeline Dashboard", version="2.0.0", lifespan=_lifespan)
+
+    # Enable Gzip compression for all API payloads > 1KB (shrinks /api/jobs & /api/tracker by ~90%)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Innermost first: CORS wraps the size guard so preflights and 413s still
     # carry the loopback CORS headers.

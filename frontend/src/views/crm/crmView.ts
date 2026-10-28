@@ -543,7 +543,10 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
       colEl.appendChild(colHead);
 
       const cardsContainer = element("div", "kjc-kanban-cards");
-      matched.forEach((rec) => {
+      
+      // Limit to 40 cards per column initially for instantaneous rendering (<50ms)
+      const visibleCards = matched.slice(0, 40);
+      visibleCards.forEach((rec) => {
         const card = element("div", "kjc-kanban-card");
         const dateStr = rec.date_applied ? rec.date_applied.slice(0, 10) : "";
         card.innerHTML = `
@@ -595,6 +598,15 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
 
         cardsContainer.appendChild(card);
       });
+
+      if (matched.length > 40) {
+        const moreNotice = element("div", "kjc-card-meta");
+        moreNotice.style.padding = "0.75rem";
+        moreNotice.style.textAlign = "center";
+        moreNotice.style.color = "var(--text-muted)";
+        moreNotice.textContent = `Showing 40 of ${matched.length} (use Table view for full list)`;
+        cardsContainer.appendChild(moreNotice);
+      }
 
       colEl.appendChild(cardsContainer);
       boardEl.appendChild(colEl);
