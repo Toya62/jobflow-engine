@@ -59,8 +59,8 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
     except Exception as e:
         print(f"[ERROR] Failed scraping {portal_name}: {e}", file=sys.stderr)
         try:
-            from src.core.notifier import send_whatsapp_alert
-            send_whatsapp_alert(f"⚠️ *Scraper Error on {portal_name}*\n\nError: {e}\nCheck GitHub Actions run logs for details.")
+            from src.core.notifier import send_telegram_alert
+            send_telegram_alert(f"⚠️ *Scraper Error on {portal_name}*\n\nError: {e}\nCheck GitHub Actions run logs for details.")
         except Exception:
             pass
         return {"scraped": 0, "approved": 0, "error": str(e)}
@@ -135,8 +135,8 @@ def _run_portal_and_ai(portal_name: str, scrape_func, auto_ai: bool = True) -> d
             except Exception as e:
                 print(f"[ERROR] Matcher failed for {portal_name}: {e}", file=sys.stderr)
                 try:
-                    from src.core.notifier import send_whatsapp_alert
-                    send_whatsapp_alert(f"⚠️ *AI Matcher Error on {portal_name}*\n\nError: {e}")
+                    from src.core.notifier import send_telegram_alert
+                    send_telegram_alert(f"⚠️ *AI Matcher Error on {portal_name}*\n\nError: {e}")
                 except Exception:
                     pass
         else:
@@ -242,8 +242,8 @@ def _run_all_portals_pipelined(p_configs, auto_ai=True):
                 print(f"[ERROR] Failed scraping {p_name}: {e}", file=sys.stderr)
                 err = str(e)
                 try:
-                    from src.core.notifier import send_whatsapp_alert
-                    send_whatsapp_alert(f"⚠️ *Scraper Error on {p_name}*\n\nError: {e}\nCheck run logs for details.")
+                    from src.core.notifier import send_telegram_alert
+                    send_telegram_alert(f"⚠️ *Scraper Error on {p_name}*\n\nError: {e}\nCheck run logs for details.")
                 except Exception:
                     pass
 
@@ -356,7 +356,7 @@ def handle_scrape(args):
     total_run_scraped = sum(v.get("scraped", 0) for v in portal_breakdown.values())
     total_run_approved = sum(v.get("approved", 0) for v in portal_breakdown.values())
 
-    # Persist latest run summary for GitHub Actions and WhatsApp alert
+    # Persist latest run summary for GitHub Actions and Telegram alert
     summary_data = {
         "portal": portal,
         "run_scraped": total_run_scraped,

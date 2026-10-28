@@ -145,11 +145,11 @@ def evaluate_single_job(row: dict, client: genai.Client | None = None, model_nam
 
     if not description or len(description) < 50:
         try:
-            from src.core.notifier import send_whatsapp_alert
+            from src.core.notifier import send_telegram_alert
             job_url = row.get("link") or row.get("job_url") or "No URL"
-            send_whatsapp_alert(f"⚠️ *Empty Job Description Detected*\n\nJob: {title} @ {company}\nURL: {job_url}\nThis job was automatically skipped by the matcher.")
+            send_telegram_alert(f"⚠️ *Empty Job Description Detected*\n\nJob: {title} @ {company}\nURL: {job_url}\nThis job was automatically skipped by the matcher.")
         except Exception as e:
-            logger.warning(f"Could not send WhatsApp alert for empty description: {e}")
+            logger.warning(f"Could not send Telegram alert for empty description: {e}")
             
         return {
             "status": "REJECTED_EMPTY_DESCRIPTION",
@@ -364,15 +364,15 @@ def run_gemini_matcher(
         err_msg = "⚠️ No supported AI provider is configured. Skipping AI matching and aborting push for this batch."
         print(err_msg)
         try:
-            from src.core.notifier import send_whatsapp_alert
+            from src.core.notifier import send_telegram_alert
             msg = (
                 "⚠️ *Karriere Pipeline Alert*\n\n"
                 "🚨 *AI Evaluation Aborted:* No supported provider API key is configured.\n"
                 "🛑 Fresh jobs were *not* evaluated or pushed to approved datasets. Configure Gemini, Groq, or OpenRouter."
             )
-            send_whatsapp_alert(msg)
+            send_telegram_alert(msg)
         except Exception as e:
-            logger.warning(f"Could not dispatch WhatsApp alert for missing key: {e}")
+            logger.warning(f"Could not dispatch Telegram alert for missing key: {e}")
         return []
 
     approved_list = []
@@ -598,10 +598,10 @@ def run_gemini_matcher_on_db(
                 logger.error(msg)
                 print(f"⛔ {msg}")
                 try:
-                    from src.core.notifier import send_whatsapp_alert
-                    send_whatsapp_alert(f"⚠️ *AI Matcher Aborted*\n\n{msg}")
+                    from src.core.notifier import send_telegram_alert
+                    send_telegram_alert(f"⚠️ *AI Matcher Aborted*\n\n{msg}")
                 except Exception as e:
-                    logger.warning(f"Could not send WhatsApp alert for aborted matcher: {e}")
+                    logger.warning(f"Could not send Telegram alert for aborted matcher: {e}")
                 break
             continue
 
@@ -687,10 +687,10 @@ def run_gemini_matcher_on_db(
             alert_msg += f"• ⚠️ FAILED completely: {failed_count} jobs could not be evaluated\n"
         logger.warning(alert_msg)
         try:
-            from src.core.notifier import send_whatsapp_alert
-            send_whatsapp_alert(alert_msg)
+            from src.core.notifier import send_telegram_alert
+            send_telegram_alert(alert_msg)
         except Exception as e:
-            logger.warning(f"Could not send WhatsApp alert: {e}")
+            logger.warning(f"Could not send Telegram alert: {e}")
 
     return approved_list
 

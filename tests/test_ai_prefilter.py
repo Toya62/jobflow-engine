@@ -170,6 +170,7 @@ def test_batch_aborts_when_all_providers_disabled(monkeypatch, tmp_path):
     monkeypatch.setattr(matcher, "get_router_status", lambda: {"providers": {"groq": 1}, "all_disabled": True, "disabled_providers": {"groq": "HTTP 402"}})
     monkeypatch.setattr(matcher, "evaluate_single_job", lambda row, **k: (calls.append(1), None)[1])
     monkeypatch.setattr(matcher.time, "sleep", lambda *_: None)
+    monkeypatch.setattr("src.core.notifier.send_telegram_alert", lambda *a, **k: True)
     monkeypatch.setattr("src.core.notifier.send_whatsapp_alert", lambda *a, **k: True)
 
     assert matcher.run_gemini_matcher_on_db(rate_limit_delay=0, db_path=str(path)) == []

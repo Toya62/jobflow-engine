@@ -72,11 +72,13 @@ def test_job_matching_can_use_fallback_provider_without_gemini_key(monkeypatch, 
     assert len(approved) == 1
 
 
-def test_whatsapp_notifier_uses_verified_tls(monkeypatch):
+def test_telegram_notifier_uses_verified_tls(monkeypatch):
     import ssl
+    import json
     from src.core import notifier
 
     contexts = []
+    sent_requests = []
 
     class Response:
         status = 200
@@ -88,17 +90,25 @@ def test_whatsapp_notifier_uses_verified_tls(monkeypatch):
             return False
 
         def read(self):
-            return b"sent"
+            return b'{"ok": true, "result": {"message_id": 1}}'
 
     def fake_urlopen(request, **kwargs):
         contexts.append(kwargs["context"])
+        sent_requests.append(request)
         return Response()
 
     monkeypatch.setattr(notifier.urllib.request, "urlopen", fake_urlopen)
 
-    assert notifier.send_whatsapp_alert("test", phone="+49123456789", api_key="test-key")
+    assert notifier.send_telegram_alert("test", bot_token="12345:ABCDEF", chat_id="987654321")
     assert contexts[0].verify_mode == ssl.CERT_REQUIRED
     assert contexts[0].check_hostname
+    assert "api.telegram.org/bot12345:ABCDEF/sendMessage" in sent_requests[0].full_url
+    payload = json.loads(sent_requests[0].data.decode("utf-8"))
+    assert payload["chat_id"] == "987654321"
+    assert payload["text"] == "test"
+
+    # Backward compatibility check
+    assert notifier.send_whatsapp_alert("test_compat", bot_token="12345:ABCDEF", chat_id="987654321")
 
 
 def test_sqlite_matching_can_use_fallback_provider_without_gemini_key(monkeypatch, tmp_path):

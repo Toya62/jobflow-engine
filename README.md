@@ -108,7 +108,7 @@ karriere-pipeline/
 │   ├── core/
 │   │   ├── config.py          # Configuration loader & profile validator
 │   │   ├── filters.py         # Rule-based candidate & tech stack filtering
-│   │   └── notifier.py        # WhatsApp alert dispatch & scrape summaries
+│   │   └── notifier.py        # Telegram alert dispatch & scrape summaries
 │   ├── db/
 │   │   ├── database.py        # Dual PostgreSQL/SQLite schema & query layer
 │   │   └── file_io.py         # Database ingestion & deduplication helpers

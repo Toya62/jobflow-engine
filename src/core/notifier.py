@@ -1,15 +1,24 @@
 """
-src/whatsapp_notifier.py — WhatsApp notification module for Karriere Pipeline.
-Supports CallMeBot API for free, zero-maintenance WhatsApp alerts with German local time (Europe/Berlin).
+src/core/notifier.py — Notification module for Karriere Pipeline.
+Supports Telegram Bot API for real-time alerts with German local time (Europe/Berlin).
 """
 
 import os
+import sys
+import json
 import urllib.parse
 import urllib.request
 import urllib.error
 import ssl
 from zoneinfo import ZoneInfo
 from datetime import datetime
+from pathlib import Path
+
+# ── Ensure workspace root is in sys.path when executed directly ──────────────
+_root_dir = Path(__file__).resolve().parent.parent.parent
+if str(_root_dir) not in sys.path:
+    sys.path.insert(0, str(_root_dir))
+
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,55 +40,63 @@ if os.path.exists(_env_path):
     except Exception:
         pass
 
-def send_whatsapp_alert(message: str, phone: str = None, api_key: str = None) -> bool:
+
+def send_telegram_alert(message: str, bot_token: str = None, chat_id: str = None, parse_mode: str = "Markdown") -> bool:
     """
-    Send a WhatsApp message via CallMeBot API.
+    Send a message via Telegram Bot API.
 
     Args:
-        message (str): Text message to send. Supports basic WhatsApp markdown (*bold*, _italic_).
-        phone (str, optional): Target phone number in international format (+49...). Defaults to env WHATSAPP_PHONE.
-        api_key (str, optional): CallMeBot API key. Defaults to env CALLMEBOT_API_KEY.
+        message (str): Text message to send. Supports Markdown or HTML.
+        bot_token (str, optional): Telegram Bot token. Defaults to TELEGRAM_BOT_TOKEN env.
+        chat_id (str, optional): Target chat ID. Defaults to TELEGRAM_CHAT_ID env.
+        parse_mode (str): Markdown or HTML parsing mode.
 
     Returns:
-        bool: True if notification was sent successfully, False otherwise.
+        bool: True if alert dispatched successfully, False otherwise.
     """
-    target_phone = phone or os.environ.get("WHATSAPP_PHONE")
-    if not target_phone:
+    token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    target_chat = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
+
+    if not token or not target_chat:
         logger.warning(
-            "[WhatsApp] WHATSAPP_PHONE not configured. Alert suppressed. "
-            "To activate WhatsApp alerts, set WHATSAPP_PHONE in your environment or .env file."
+            "[Telegram] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured. Alert suppressed. "
+            "To activate Telegram alerts, set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env or environment."
         )
         return False
 
-    target_phone = target_phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-    if not target_phone.startswith("+"):
-        target_phone = "+" + target_phone
-
-    key = api_key or os.environ.get("CALLMEBOT_API_KEY")
-
-    if not key:
-        logger.warning(
-            "[WhatsApp] CALLMEBOT_API_KEY not configured. Alert suppressed. "
-            "To activate WhatsApp alerts, set CALLMEBOT_API_KEY and WHATSAPP_PHONE in your environment or GitHub Secrets."
-        )
-        return False
-
-    encoded_msg = urllib.parse.quote(message)
-    url = f"https://api.callmebot.com/whatsapp.php?phone={target_phone}&text={encoded_msg}&apikey={key}"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": str(target_chat).strip(),
+        "text": message,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": True,
+    }
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15, context=ssl.create_default_context()) as resp:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "KarrierePipeline/2.0"},
+            method="POST",
+        )
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
             body = resp.read().decode("utf-8")
             if resp.status == 200:
-                logger.info(f"[WhatsApp] Alert successfully dispatched to {target_phone}")
+                logger.info(f"[Telegram] Alert successfully dispatched to chat {target_chat}")
                 return True
             else:
-                logger.error(f"[WhatsApp] CallMeBot API returned HTTP {resp.status}: {body}")
+                logger.error(f"[Telegram] Telegram Bot API returned HTTP {resp.status}: {body}")
                 return False
     except Exception as e:
-        logger.error(f"[WhatsApp] Connection error when sending WhatsApp alert: {e}")
+        logger.error(f"[Telegram] Connection error when sending Telegram alert: {e}")
         return False
+
+
+# Backward compatibility alias for transition
+send_alert = send_telegram_alert
+send_whatsapp_alert = send_telegram_alert
 
 
 def notify_scrape_summary(
@@ -114,14 +131,15 @@ def notify_scrape_summary(
         f"⭐ *AI Approved (Today):* {approved_count}\n"
         f"📊 *Total Scraped (Today):* {new_jobs_count}"
     )
-    return send_whatsapp_alert(msg)
+    return send_telegram_alert(msg)
 
 
 if __name__ == "__main__":
     test_time = datetime.now(GERMAN_TZ).strftime("%d.%m.%Y, %H:%M CEST")
     test_msg = f"🔔 *Test Alert from Karriere Pipeline*\n\nGerman Time Synchronization Active: *{test_time}*"
-    target = os.environ.get("WHATSAPP_PHONE")
-    print(f"Testing WhatsApp dispatch with phone: {target or '[Not set - check .env]'}")
-    success = send_whatsapp_alert(test_msg)
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat = os.environ.get("TELEGRAM_CHAT_ID")
+    print(f"Testing Telegram dispatch with token: {'[Set]' if token else '[Not set]'}, chat: {chat or '[Not set]'}")
+    success = send_telegram_alert(test_msg)
     if not success:
-        print("Note: Set WHATSAPP_PHONE and CALLMEBOT_API_KEY in your .env or GitHub secrets to enable live messaging.")
+        print("Note: Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in your .env or environment to enable live alerts.")

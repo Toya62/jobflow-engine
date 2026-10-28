@@ -88,8 +88,8 @@ def fetch_single_job_details(job_url: str, session: requests.Session | None = No
                     logger.warning(f"⚠️ [LinkedIn] Voyager API returned {reason}. LINKEDIN_LI_AT session cookie may be expired or invalid.")
                     _COOKIE_EXPIRED_WARNED = True
                     try:
-                        from src.core.notifier import send_whatsapp_alert
-                        send_whatsapp_alert(f"🔑 *LinkedIn Cookie Alert*\n\nVoyager API returned {reason}. Please refresh LINKEDIN_LI_AT in GitHub Secrets.")
+                        from src.core.notifier import send_telegram_alert
+                        send_telegram_alert(f"🔑 *LinkedIn Cookie Alert*\n\nVoyager API returned {reason}. Please refresh LINKEDIN_LI_AT in GitHub Secrets.")
                     except Exception:
                         pass
             elif v_resp.status_code == 200:
