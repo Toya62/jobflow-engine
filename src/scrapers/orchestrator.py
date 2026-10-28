@@ -153,25 +153,44 @@ def run_scrape_linkedin():
     from src.scrapers.linkedin import scrape_linkedin, hydrate_linkedin_jobs
 
     li_frames = []
-    for query in BOOLEAN_QUERIES:
-        try:
-            jobs = scrape_linkedin(query, results_wanted=LINKEDIN_RESULTS_WANTED, hours_old=linkedin_hours_old)
-            count = 0 if jobs is None or jobs.empty else len(jobs)
-            if count:
-                li_frames.append(jobs)
-            logger.info(f"  '{query[:40]}...': {count} rows (metadata)")
-        except Exception as exc:
-            logger.info(f"  Warning: '{query[:40]}...' failed: {exc}")
-        time.sleep(1)
+    # If rotating deep exploration is enabled or standard:
+    deep_mode = os.getenv("SCRAPE_DEEP", "false").lower() in ("true", "1", "yes")
+    offsets = [0, 25] if deep_mode else [0]
+
+    for offset in offsets:
+        offset_tag = f" (offset {offset})" if offset else ""
+        for query in BOOLEAN_QUERIES:
+            try:
+                if offset == 0:
+                    jobs = scrape_linkedin(query, results_wanted=LINKEDIN_RESULTS_WANTED, hours_old=linkedin_hours_old)
+                else:
+                    jobs = scrape_linkedin(query, results_wanted=LINKEDIN_RESULTS_WANTED, hours_old=linkedin_hours_old, offset=offset)
+                count = 0 if jobs is None or jobs.empty else len(jobs)
+                if count:
+                    li_frames.append(jobs)
+                logger.info(f"  '{query[:35]}...'{offset_tag}: {count} rows (metadata)")
+            except Exception as exc:
+                logger.info(f"  Warning: '{query[:35]}...' failed: {exc}")
+            time.sleep(1)
 
     li_df = pd.concat(li_frames, ignore_index=True) if li_frames else pd.DataFrame()
     if not li_df.empty:
-        logger.info(f"\n  Raw LinkedIn jobs: {len(li_df)}")
+        raw_scraped_cnt = len(li_df)
+        logger.info(f"\n  Raw LinkedIn jobs: {raw_scraped_cnt}")
         li_df = dedup(li_df)
         li_df = filter_known_jobs(li_df)
         li_df = filter_against_existing_catalog(li_df)
-        li_df = hydrate_linkedin_jobs(li_df, max_workers=8)
-        li_df = apply_filters(li_df, is_linkedin=True)
+        unseen_cnt = len(li_df)
+        skipped_seen = raw_scraped_cnt - unseen_cnt
+        if skipped_seen > 0:
+            logger.info(f"  ⚡ Skipped {skipped_seen} already-cataloged jobs before HTTP hydration!")
+
+        # Only hydrate descriptions for fresh unseen jobs!
+        if unseen_cnt > 0:
+            li_df = hydrate_linkedin_jobs(li_df, max_workers=8)
+            li_df = apply_filters(li_df, is_linkedin=True)
+        else:
+            logger.info("  No fresh unseen LinkedIn jobs in this run — finished fast without network waste.")
 
     finalise(li_df, "LinkedIn", is_linkedin=True)
 
@@ -189,21 +208,40 @@ def run_scrape_indeed():
     from src.scrapers.indeed import scrape_indeed
 
     frames = []
-    for query in BOOLEAN_QUERIES:
-        try:
-            jobs = scrape_indeed(query, results_wanted=INDEED_RESULTS_WANTED, hours_old=indeed_hours_old)
-            count = 0 if jobs is None or jobs.empty else len(jobs)
-            if count:
-                frames.append(jobs)
-            logger.info(f"  '{query[:40]}...': {count} rows")
-        except Exception as exc:
-            logger.info(f"  Warning: '{query[:40]}...' failed: {exc}")
-        time.sleep(2)
+    deep_mode = os.getenv("SCRAPE_DEEP", "false").lower() in ("true", "1", "yes")
+    offsets = [0, 20] if deep_mode else [0]
+
+    for offset in offsets:
+        offset_tag = f" (offset {offset})" if offset else ""
+        for query in BOOLEAN_QUERIES:
+            try:
+                if offset == 0:
+                    jobs = scrape_indeed(query, results_wanted=INDEED_RESULTS_WANTED, hours_old=indeed_hours_old)
+                else:
+                    jobs = scrape_indeed(query, results_wanted=INDEED_RESULTS_WANTED, hours_old=indeed_hours_old, offset=offset)
+                count = 0 if jobs is None or jobs.empty else len(jobs)
+                if count:
+                    frames.append(jobs)
+                logger.info(f"  '{query[:35]}...'{offset_tag}: {count} rows")
+            except Exception as exc:
+                logger.info(f"  Warning: '{query[:35]}...' failed: {exc}")
+            time.sleep(2)
 
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     if not df.empty:
-        logger.info(f"\n  Raw Indeed jobs: {len(df)}")
-        df = apply_filters(df, is_linkedin=False)
+        raw_cnt = len(df)
+        logger.info(f"\n  Raw Indeed jobs: {raw_cnt}")
+        df = dedup(df)
+        df = filter_known_jobs(df)
+        df = filter_against_existing_catalog(df)
+        unseen_cnt = len(df)
+        skipped = raw_cnt - unseen_cnt
+        if skipped > 0:
+            logger.info(f"  ⚡ Skipped {skipped} already-cataloged Indeed jobs!")
+        if unseen_cnt > 0:
+            df = apply_filters(df, is_linkedin=False)
+        else:
+            logger.info("  No fresh unseen Indeed jobs in this run.")
 
     finalise(df, "Indeed", is_linkedin=False)
 
