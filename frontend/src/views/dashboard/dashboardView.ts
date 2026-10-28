@@ -166,8 +166,8 @@ function renderDashboard(container: HTMLElement, stats: FunnelStatsResponse): vo
         <!-- Card 2: AI Rejection Analytics -->
         <div class="kjc-engine-card">
           <div class="kjc-engine-card-header">
-            <span class="kjc-engine-card-title">AI Decision Gates (AGENTS.md)</span>
-            <span style="font-size:0.75rem;color:var(--text-muted);">Strict Profile Guards</span>
+            <span class="kjc-engine-card-title">AI Qualification Filters</span>
+            <span style="font-size:0.75rem;color:var(--text-muted);">Profile Match Guardrails</span>
           </div>
           <div class="kjc-engine-bars">
             ${sortedRejections
