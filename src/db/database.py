@@ -229,13 +229,31 @@ def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
             cover_pdf_path TEXT,
             status TEXT DEFAULT 'Prepared',
             applied_at TEXT,
+            sent_at TEXT,
+            sent_method TEXT,
+            sent_to TEXT,
+            follow_up_at TEXT,
             notes TEXT
         );
+        CREATE TABLE IF NOT EXISTS sent_emails (
+            id SERIAL PRIMARY KEY,
+            application_id INTEGER REFERENCES applications(id) ON DELETE CASCADE,
+            recipient TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'SENT'
+        );
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS sent_at TEXT;
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS sent_method TEXT;
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS sent_to TEXT;
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS follow_up_at TEXT;
         CREATE INDEX IF NOT EXISTS idx_jobs_scraped_at ON jobs(scraped_at);
         CREATE INDEX IF NOT EXISTS idx_jobs_url ON jobs(url);
         CREATE INDEX IF NOT EXISTS idx_evaluations_job_status ON evaluations(job_id, status);
         CREATE INDEX IF NOT EXISTS idx_evaluations_status ON evaluations(status);
         CREATE INDEX IF NOT EXISTS idx_applications_job_status ON applications(job_id, status);
+        CREATE INDEX IF NOT EXISTS idx_applications_follow_up ON applications(follow_up_at);
         ''')
         conn.commit()
         return conn
@@ -283,17 +301,50 @@ def setup_db(db_path: str | os.PathLike[str] = DB_PATH):
         cover_pdf_path TEXT,
         status TEXT DEFAULT 'Prepared',
         applied_at TEXT,
+        sent_at TEXT,
+        sent_method TEXT,
+        sent_to TEXT,
+        follow_up_at TEXT,
         notes TEXT,
         FOREIGN KEY(job_id) REFERENCES jobs(id),
         UNIQUE(job_id)
     )
     ''')
 
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS sent_emails (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        application_id INTEGER,
+        recipient TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'SENT',
+        FOREIGN KEY(application_id) REFERENCES applications(id)
+    )
+    ''')
+
+    # Safe dynamic column migrations for SQLite
+    try:
+        cursor.execute("PRAGMA table_info(applications);")
+        existing_cols = {r[1] for r in cursor.fetchall()}
+        for col_def in [
+            ("sent_at", "TEXT"),
+            ("sent_method", "TEXT"),
+            ("sent_to", "TEXT"),
+            ("follow_up_at", "TEXT")
+        ]:
+            if col_def[0] not in existing_cols:
+                cursor.execute(f"ALTER TABLE applications ADD COLUMN {col_def[0]} {col_def[1]};")
+    except Exception:
+        pass
+
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_jobs_scraped_at ON jobs(scraped_at)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_jobs_url ON jobs(url)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_evaluations_job_status ON evaluations(job_id, status)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_evaluations_status ON evaluations(status)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_applications_job_status ON applications(job_id, status)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_applications_follow_up ON applications(follow_up_at)')
 
     conn.commit()
     return conn

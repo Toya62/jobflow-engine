@@ -36,6 +36,23 @@ class ApplicationPatchRequest(_LenientModel):
     job_url: str | None = None
     notes: str | None = None
     status: str | None = None
+    sent_at: str | None = None
+    sent_method: str | None = None
+    sent_to: str | None = None
+    follow_up_at: str | None = None
+
+
+class ApplicationSubmitRequest(_LenientModel):
+    """Body for submitting an application (moving from Prepared to Applied)."""
+
+    company: str | None = None
+    position: str | None = None
+    job_url: str | None = None
+    sent_method: str = "email"
+    sent_to: str | None = None
+    subject: str | None = None
+    body: str | None = None
+    notes: str | None = None
 
 
 class ApplicationDeleteRequest(_LenientModel):

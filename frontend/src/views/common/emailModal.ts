@@ -189,12 +189,15 @@ export function openEmailModal(job: EmailModalJob): void {
               padding-top: 10px;
               border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
             ">
-              <div style="display:flex; gap:8px;">
-                <button type="button" id="kjc-m-mailto" class="kjc-btn kjc-btn-primary" style="font-weight:600; cursor:pointer;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" id="kjc-m-submit" class="kjc-btn kjc-btn-primary" style="font-weight:600; cursor:pointer; background:var(--accent-success, #10b981);">
+                  🚀 Submit & Mark Applied
+                </button>
+                <button type="button" id="kjc-m-mailto" class="kjc-btn" style="font-weight:600; cursor:pointer;">
                   📬 Open in Mail App
                 </button>
                 <button type="button" id="kjc-m-copy" class="kjc-btn" style="cursor:pointer;">
-                  📋 Copy Email Body
+                  📋 Copy Text
                 </button>
               </div>
               <button type="button" id="kjc-m-cancel" class="kjc-btn" style="cursor:pointer;">Close</button>
@@ -207,6 +210,7 @@ export function openEmailModal(job: EmailModalJob): void {
         const bodyTextarea = bodyEl.querySelector<HTMLTextAreaElement>("#kjc-m-body");
         const copyBtn = bodyEl.querySelector<HTMLButtonElement>("#kjc-m-copy");
         const mailtoBtn = bodyEl.querySelector<HTMLButtonElement>("#kjc-m-mailto");
+        const submitBtn = bodyEl.querySelector<HTMLButtonElement>("#kjc-m-submit");
         const cancelBtn = bodyEl.querySelector<HTMLButtonElement>("#kjc-m-cancel");
 
         cancelBtn?.addEventListener("click", close);
@@ -227,6 +231,32 @@ export function openEmailModal(job: EmailModalJob): void {
           const bod = encodeURIComponent(bodyTextarea?.value || "");
           const mailto = rec ? `mailto:${rec}?subject=${sub}&body=${bod}` : `mailto:?subject=${sub}&body=${bod}`;
           window.open(mailto, "_blank");
+        });
+
+        submitBtn?.addEventListener("click", async () => {
+          if (!submitBtn) return;
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Submitting...";
+          try {
+            await api.submitApplication({
+              company: job.company || undefined,
+              position: job.position || job.title || undefined,
+              job_url: job.job_url || undefined,
+              sent_method: "email",
+              sent_to: recipientInput?.value.trim() || undefined,
+              subject: subjectInput?.value.trim() || undefined,
+              body: bodyTextarea?.value || undefined,
+            });
+            submitBtn.textContent = "✓ Applied!";
+            setTimeout(() => {
+              close();
+              window.dispatchEvent(new CustomEvent("kjc:application-submitted"));
+            }, 800);
+          } catch (e) {
+            alert("Failed submitting application: " + String(e));
+            submitBtn.disabled = false;
+            submitBtn.textContent = "🚀 Submit & Mark Applied";
+          }
         });
       } else {
         bodyEl.innerHTML = `

@@ -13,7 +13,16 @@ const DEBOUNCE_MS = 200;
 const DEFAULT_VIEWPORT_HEIGHT = 480;
 
 /** Lifecycle: Prepared -> Applied (auto on opening the job link) -> Interview (upcoming) / Interviewed (already done) / Rejected (manual). */
-const STATUS_OPTIONS = ["Prepared", "Applied", "Interview", "Interviewed", "Rejected"] as const;
+const STATUS_OPTIONS = [
+  "Prepared",
+  "Applied",
+  "Interview",
+  "Offer",
+  "Accepted",
+  "Rejected-by-Employer",
+  "Ghosted",
+  "Rejected",
+] as const;
 
 const DATE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ["today", "Today Only"],
@@ -525,7 +534,7 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
       { id: "applied", title: "📤 Applied", statuses: ["applied", "sent"] },
       { id: "interview", title: "💬 Interview", statuses: ["interview", "interviewed", "screening", "assessment"] },
       { id: "offer", title: "🏆 Offer", statuses: ["offer", "accepted"] },
-      { id: "rejected", title: "❌ Rejected", statuses: ["rejected", "declined", "ghosted"] },
+      { id: "rejected", title: "❌ Rejected / Ghosted", statuses: ["rejected", "rejected-by-employer", "declined", "ghosted"] },
     ];
 
     cols.forEach((col) => {

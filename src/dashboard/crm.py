@@ -38,7 +38,8 @@ def load_tracker_df() -> pd.DataFrame:
             q = '''
             SELECT j.company, j.title as position, a.applied_at as date_applied,
                    'AI Generated' as source, j.url as job_url,
-                   a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status as status, a.applied_at as updated_at
+                   a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status as status, a.applied_at as updated_at,
+                   a.sent_at, a.sent_method, a.sent_to, a.follow_up_at
             FROM applications a
             JOIN jobs j ON a.job_id = j.id
             '''
@@ -149,7 +150,8 @@ def resolve_job_id(cursor, company: str, title: str, job_url: str = ""):
 def upsert_tracker_row(company: str, position: str, job_url: str = "",
                        cv_path=UNSET, cover_path=UNSET, notes=UNSET,
                        status=UNSET, date_applied=UNSET, create: bool = True,
-                       description=UNSET) -> bool:
+                       description=UNSET, sent_at=UNSET, sent_method=UNSET,
+                       sent_to=UNSET, follow_up_at=UNSET) -> bool:
     """Insert or update a SINGLE CRM application row.
 
     Only the addressed row is written, so a concurrent edit or deletion of a
@@ -211,44 +213,103 @@ def upsert_tracker_row(company: str, position: str, job_url: str = "",
                 (new_description, job_id)
             )
 
-        cursor.execute(
-            'SELECT cv_pdf_path, cover_pdf_path, notes, status, applied_at FROM applications WHERE job_id = ?',
-            (job_id,)
-        )
-        existing = cursor.fetchone()
-        if existing is None and not create:
-            # Fallback: check if an application exists for any job with the same URL or company/title
-            alt_row = None
-            if job_url:
-                cursor.execute(
-                    """
-                    SELECT a.job_id, a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status, a.applied_at
-                    FROM applications a
-                    JOIN jobs j ON a.job_id = j.id
-                    WHERE j.url = ?
-                    LIMIT 1
-                    """,
-                    (job_url,)
-                )
-                alt_row = cursor.fetchone()
-            if not alt_row and company and position:
-                cursor.execute(
-                    """
-                    SELECT a.job_id, a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status, a.applied_at
-                    FROM applications a
-                    JOIN jobs j ON a.job_id = j.id
-                    WHERE LOWER(TRIM(j.company)) = LOWER(TRIM(?)) AND LOWER(TRIM(j.title)) = LOWER(TRIM(?))
-                    LIMIT 1
-                    """,
-                    (company, position)
-                )
-                alt_row = cursor.fetchone()
-            if alt_row:
-                job_id = alt_row[0]
-                existing = alt_row[1:]
-            else:
-                return False
-        ex_cv, ex_cover, ex_notes, ex_status, ex_date = existing if existing else ('', '', '', None, '')
+        # Inspect available columns on applications to support test schemas or older databases
+        has_new_cols = True
+        try:
+            cursor.execute("PRAGMA table_info(applications)")
+            cols = {r[1] for r in cursor.fetchall()}
+            if cols and "sent_at" not in cols:
+                has_new_cols = False
+        except Exception:
+            pass
+
+        if has_new_cols:
+            cursor.execute(
+                'SELECT cv_pdf_path, cover_pdf_path, notes, status, applied_at, sent_at, sent_method, sent_to, follow_up_at FROM applications WHERE job_id = ?',
+                (job_id,)
+            )
+            existing = cursor.fetchone()
+            if existing is None and not create:
+                # Fallback: check if an application exists for any job with the same URL or company/title
+                alt_row = None
+                if job_url:
+                    cursor.execute(
+                        """
+                        SELECT a.job_id, a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status, a.applied_at,
+                               a.sent_at, a.sent_method, a.sent_to, a.follow_up_at
+                        FROM applications a
+                        JOIN jobs j ON a.job_id = j.id
+                        WHERE j.url = ?
+                        LIMIT 1
+                        """,
+                        (job_url,)
+                    )
+                    alt_row = cursor.fetchone()
+                if not alt_row and company and position:
+                    cursor.execute(
+                        """
+                        SELECT a.job_id, a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status, a.applied_at,
+                               a.sent_at, a.sent_method, a.sent_to, a.follow_up_at
+                        FROM applications a
+                        JOIN jobs j ON a.job_id = j.id
+                        WHERE LOWER(TRIM(j.company)) = LOWER(TRIM(?)) AND LOWER(TRIM(j.title)) = LOWER(TRIM(?))
+                        LIMIT 1
+                        """,
+                        (company, position)
+                    )
+                    alt_row = cursor.fetchone()
+                if alt_row:
+                    job_id = alt_row[0]
+                    existing = alt_row[1:]
+                else:
+                    return False
+            (ex_cv, ex_cover, ex_notes, ex_status, ex_date,
+             ex_sent_at, ex_sent_method, ex_sent_to, ex_follow_up) = (
+                existing if existing and len(existing) >= 9
+                else (existing[0], existing[1], existing[2], existing[3], existing[4], None, None, None, None)
+                if existing else ('', '', '', None, '', None, None, None, None)
+            )
+        else:
+            cursor.execute(
+                'SELECT cv_pdf_path, cover_pdf_path, notes, status, applied_at FROM applications WHERE job_id = ?',
+                (job_id,)
+            )
+            existing = cursor.fetchone()
+            if existing is None and not create:
+                alt_row = None
+                if job_url:
+                    cursor.execute(
+                        """
+                        SELECT a.job_id, a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status, a.applied_at
+                        FROM applications a
+                        JOIN jobs j ON a.job_id = j.id
+                        WHERE j.url = ?
+                        LIMIT 1
+                        """,
+                        (job_url,)
+                    )
+                    alt_row = cursor.fetchone()
+                if not alt_row and company and position:
+                    cursor.execute(
+                        """
+                        SELECT a.job_id, a.cv_pdf_path, a.cover_pdf_path, a.notes, a.status, a.applied_at
+                        FROM applications a
+                        JOIN jobs j ON a.job_id = j.id
+                        WHERE LOWER(TRIM(j.company)) = LOWER(TRIM(?)) AND LOWER(TRIM(j.title)) = LOWER(TRIM(?))
+                        LIMIT 1
+                        """,
+                        (company, position)
+                    )
+                    alt_row = cursor.fetchone()
+                if alt_row:
+                    job_id = alt_row[0]
+                    existing = alt_row[1:]
+                else:
+                    return False
+            ex_cv, ex_cover, ex_notes, ex_status, ex_date = (
+                existing if existing else ('', '', '', None, '')
+            )
+            ex_sent_at = ex_sent_method = ex_sent_to = ex_follow_up = None
 
         # Paths: a non-empty value wins; empty/omitted keeps the stored value.
         final_cv = str(cv_path) if (cv_path is not UNSET and clean_cell(cv_path)) else (ex_cv or '')
@@ -268,16 +329,39 @@ def upsert_tracker_row(company: str, position: str, job_url: str = "",
         else:
             final_date = str(date_applied)
 
-        cursor.execute('''
-        INSERT INTO applications (job_id, cv_pdf_path, cover_pdf_path, applied_at, notes, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(job_id) DO UPDATE SET
-            cv_pdf_path = excluded.cv_pdf_path,
-            cover_pdf_path = excluded.cover_pdf_path,
-            applied_at = excluded.applied_at,
-            notes = excluded.notes,
-            status = excluded.status
-        ''', (job_id, final_cv, final_cover, final_date, final_notes, final_status))
+        final_sent_at = ex_sent_at if sent_at is UNSET else (str(sent_at) if sent_at else None)
+        final_sent_method = ex_sent_method if sent_method is UNSET else (str(sent_method) if sent_method else None)
+        final_sent_to = ex_sent_to if sent_to is UNSET else (str(sent_to) if sent_to else None)
+        final_follow_up = ex_follow_up if follow_up_at is UNSET else (str(follow_up_at) if follow_up_at else None)
+
+        if has_new_cols:
+            cursor.execute('''
+            INSERT INTO applications (job_id, cv_pdf_path, cover_pdf_path, applied_at, notes, status,
+                                      sent_at, sent_method, sent_to, follow_up_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id) DO UPDATE SET
+                cv_pdf_path = excluded.cv_pdf_path,
+                cover_pdf_path = excluded.cover_pdf_path,
+                applied_at = excluded.applied_at,
+                notes = excluded.notes,
+                status = excluded.status,
+                sent_at = excluded.sent_at,
+                sent_method = excluded.sent_method,
+                sent_to = excluded.sent_to,
+                follow_up_at = excluded.follow_up_at
+            ''', (job_id, final_cv, final_cover, final_date, final_notes, final_status,
+                  final_sent_at, final_sent_method, final_sent_to, final_follow_up))
+        else:
+            cursor.execute('''
+            INSERT INTO applications (job_id, cv_pdf_path, cover_pdf_path, applied_at, notes, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id) DO UPDATE SET
+                cv_pdf_path = excluded.cv_pdf_path,
+                cover_pdf_path = excluded.cover_pdf_path,
+                applied_at = excluded.applied_at,
+                notes = excluded.notes,
+                status = excluded.status
+            ''', (job_id, final_cv, final_cover, final_date, final_notes, final_status))
         conn.commit()
         return True
     except Exception as e:

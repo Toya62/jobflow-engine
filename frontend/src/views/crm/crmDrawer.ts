@@ -89,8 +89,13 @@ export function createCrmDrawer(): CrmDrawer {
     }
     if (bodyEl) {
       const existing = String(record.description ?? "").trim();
+      const isPrepared = !record.status || record.status.toLowerCase() === "prepared" || record.status.toLowerCase() === "draft";
+      const submitActionBtn = isPrepared
+        ? `<button type="button" class="kjc-btn kjc-btn-primary" data-role="submit-app" style="background:var(--accent-success, #10b981);font-weight:600;">🚀 Submit Application</button>`
+        : `<button type="button" class="kjc-btn" data-role="submit-app">📤 Re-Submit / Log Send</button>`;
+
       const cvLink = record.cv_pdf_path
-        ? `<a class="kjc-btn kjc-btn-primary" href="/${escapeHtml(record.cv_pdf_path)}" target="_blank">📄 Open CV PDF ↗</a>`
+        ? `<a class="kjc-btn" href="/${escapeHtml(record.cv_pdf_path)}" target="_blank">📄 Open CV PDF ↗</a>`
         : "";
       const clLink = record.cover_pdf_path
         ? `<a class="kjc-btn" href="/${escapeHtml(record.cover_pdf_path)}" target="_blank">📝 Open Cover Letter ↗</a>`
@@ -100,11 +105,12 @@ export function createCrmDrawer(): CrmDrawer {
         : "";
 
       bodyEl.innerHTML = `
-        <div class="kjc-modal-action-bar">
+        <div class="kjc-modal-action-bar" style="gap:8px;flex-wrap:wrap;">
+          ${submitActionBtn}
+          <button type="button" class="kjc-btn" data-role="email">✉️ Draft Recruiter Email</button>
           ${cvLink}
           ${clLink}
           <button type="button" class="kjc-btn" data-role="generate">⚡ Re-Generate Files</button>
-          <button type="button" class="kjc-btn" data-role="email">✉️ Draft Recruiter Email</button>
           ${jobUrlLink}
           <button type="button" class="kjc-btn" data-role="copy-desc" ${existing ? "" : "disabled"}>
             📋 ${existing ? "Copy Description" : "Loading…"}
@@ -123,7 +129,18 @@ export function createCrmDrawer(): CrmDrawer {
       const descEl = bodyEl.querySelector<HTMLElement>("[data-role='desc']");
       const generateBtn = bodyEl.querySelector<HTMLButtonElement>("[data-role='generate']");
       const emailBtn = bodyEl.querySelector<HTMLButtonElement>("[data-role='email']");
+      const submitBtn = bodyEl.querySelector<HTMLButtonElement>("[data-role='submit-app']");
       const closeBtn = bodyEl.querySelector<HTMLButtonElement>("[data-role='close2']");
+
+      submitBtn?.addEventListener("click", () => {
+        const desc = descEl?.textContent?.trim() || String(record.description || "");
+        openEmailModal({
+          company: record.company,
+          position: record.position,
+          job_url: record.job_url,
+          description: desc,
+        });
+      });
 
       copyBtn?.addEventListener("click", () => {
         const text = descEl?.textContent || "";

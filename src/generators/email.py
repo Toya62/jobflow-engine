@@ -152,24 +152,22 @@ def _get_jobs_df():
         return _JOBS_CACHE
     try:
         import pandas as pd
-        frames = []
-        for path in ['data/all_combined.csv', 'data/ai_approved.csv', 'data/toyath_best_jobs.csv']:
-            if os.path.exists(path):
-                try:
-                    df = pd.read_csv(path, usecols=['company', 'title', 'job_url', 'description'])
-                    frames.append(df)
-                except Exception:
-                    pass
-        if frames:
-            combined = pd.concat(frames, ignore_index=True)
-            if 'job_url' in combined.columns:
-                combined = combined.drop_duplicates(subset=['job_url'])
-            _JOBS_CACHE = combined
+        from src.db.database import get_db_connection, is_postgres
+        db_path = "data/karriere.db"
+        if is_postgres() or os.path.exists(db_path):
+            with get_db_connection(db_path) as conn:
+                df = pd.read_sql_query(
+                    "SELECT company, title, url as job_url, description FROM jobs WHERE description IS NOT NULL AND length(description) > 30",
+                    conn
+                )
+                if not df.empty and 'job_url' in df.columns:
+                    df = df.drop_duplicates(subset=['job_url'])
+                _JOBS_CACHE = df
         else:
             _JOBS_CACHE = pd.DataFrame()
     except Exception as e:
-        logger.warning(f"Failed to load jobs cache for email generator: {e}")
-        _JOBS_CACHE = None
+        logger.warning(f"Failed to load jobs cache from DB for email generator: {e}")
+        _JOBS_CACHE = pd.DataFrame()
     return _JOBS_CACHE
 
 

@@ -23,6 +23,7 @@ from src.dashboard.git_ops import git_sync_async
 from src.dashboard.schemas import (
     ApplicationDeleteRequest,
     ApplicationPatchRequest,
+    ApplicationSubmitRequest,
     ApplicationUpsertRequest,
     MessageResponse,
     SuccessResponse,
@@ -154,10 +155,14 @@ def create_or_update_application(body: ApplicationUpsertRequest):
 @router.patch("/applications")
 @router.patch("/applications/notes")
 def patch_application(body: ApplicationPatchRequest):
-    """Update only the matched CRM row (notes and/or status)."""
+    """Update only the matched CRM row (notes, status, sent fields, follow up)."""
     try:
         notes_val = body.notes if "notes" in body.model_fields_set else UNSET
         status_val = body.status if "status" in body.model_fields_set else UNSET
+        sent_at_val = body.sent_at if "sent_at" in body.model_fields_set else UNSET
+        sent_method_val = body.sent_method if "sent_method" in body.model_fields_set else UNSET
+        sent_to_val = body.sent_to if "sent_to" in body.model_fields_set else UNSET
+        follow_up_val = body.follow_up_at if "follow_up_at" in body.model_fields_set else UNSET
 
         updated = upsert_tracker_row(
             company=body.company or "",
@@ -165,6 +170,10 @@ def patch_application(body: ApplicationPatchRequest):
             job_url=body.job_url or "",
             notes=notes_val,
             status=status_val,
+            sent_at=sent_at_val,
+            sent_method=sent_method_val,
+            sent_to=sent_to_val,
+            follow_up_at=follow_up_val,
             create=False,
         )
         if updated:
@@ -176,6 +185,71 @@ def patch_application(body: ApplicationPatchRequest):
             content={"error": "Application record not found.", "job_url": body.job_url, "company": body.company},
         )
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/applications/submit")
+def submit_application(body: ApplicationSubmitRequest):
+    """Submit an application: moves status Prepared -> Applied, records sent_at, logs email if present."""
+    from datetime import datetime, timedelta
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    follow_up_str = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    try:
+        updated = upsert_tracker_row(
+            company=body.company or "",
+            position=body.position or "",
+            job_url=body.job_url or "",
+            status="Applied",
+            date_applied=now_str[:10],
+            sent_at=now_str,
+            sent_method=body.sent_method or "email",
+            sent_to=body.sent_to,
+            follow_up_at=follow_up_str,
+            notes=body.notes or UNSET,
+            create=False,
+        )
+        if not updated:
+            return JSONResponse(status_code=404, content={"error": "Application record not found"})
+
+        # Record email log if body and subject are present
+        if body.sent_to and (body.body or body.subject):
+            from src.db.database import get_db_connection, is_postgres
+            db_p = "data/karriere.db"
+            if is_postgres() or os.path.exists(db_p):
+                with get_db_connection(db_p) as conn:
+                    cur = conn.cursor()
+                    cur.execute(
+                        """
+                        SELECT a.id FROM applications a
+                        JOIN jobs j ON a.job_id = j.id
+                        WHERE j.url = ? OR (j.company = ? AND j.title = ?)
+                        LIMIT 1
+                        """,
+                        (body.job_url or "", body.company or "", body.position or "")
+                    )
+                    r = cur.fetchone()
+                    if r:
+                        app_id = r[0]
+                        cur.execute(
+                            """
+                            INSERT INTO sent_emails (application_id, recipient, subject, body, sent_at, status)
+                            VALUES (?, ?, ?, ?, ?, 'SENT')
+                            """,
+                            (app_id, body.sent_to, body.subject or "", body.body or "", now_str)
+                        )
+                        conn.commit()
+
+        clear_data_caches()
+        git_sync_async("feat: crm submit application [auto]")
+        return {
+            "success": True,
+            "status": "Applied",
+            "sent_at": now_str,
+            "follow_up_at": follow_up_str
+        }
+    except Exception as e:
+        logger.error(f"Failed submitting application: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

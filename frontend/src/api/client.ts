@@ -85,6 +85,8 @@ export const api = {
   appliedUrls: () => request<string[]>("/api/applied-urls"),
   createApplication: (body: any) => request<{ success: boolean }>("/api/applications", {}, "POST", body),
   updateApplication: (body: any) => request<{ success: boolean }>("/api/applications", {}, "PATCH", body),
+  submitApplication: (body: { company?: string; position?: string; job_url?: string; sent_method?: string; sent_to?: string; subject?: string; body?: string; notes?: string }) =>
+    request<{ success: boolean; status: string; sent_at: string; follow_up_at: string }>("/api/applications/submit", {}, "POST", body),
   /** Removes the CRM row + generated files only; keep_job=true leaves the Job Finder row (no dismissal). */
   deleteApplication: (body: any) => request<{ success: boolean }>("/api/applications", { keep_job: true }, "DELETE", body),
 
