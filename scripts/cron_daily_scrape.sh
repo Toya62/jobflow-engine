@@ -28,6 +28,12 @@ fi
 EXIT_CODE=0
 docker exec -i karriere-dashboard python main.py auto --days 1 >> "$LOG_FILE" 2>&1 || EXIT_CODE=$?
 
+# Trigger Cloudflare R2 backup on successful run
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✓ Triggering cloud backup to Cloudflare R2..." | tee -a "$LOG_FILE"
+    python3 "${REPO_DIR}/src/core/backup.py" >> "$LOG_FILE" 2>&1 || true
+fi
+
 if [ $EXIT_CODE -eq 0 ]; then
     echo "✓ Automation completed successfully at $(date -u +'%Y-%m-%d %H:%M:%S UTC')" | tee -a "$LOG_FILE"
     if [ -n "${HEALTHCHECK_URL:-}" ]; then
