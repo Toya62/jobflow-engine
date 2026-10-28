@@ -45,18 +45,32 @@ def is_r2_configured() -> bool:
 def create_postgres_dump(output_path: str) -> bool:
     """Dump PostgreSQL database to compressed .sql.gz file."""
     try:
-        # Check if running on Oracle host with Docker container
-        cmd = ["docker", "exec", "karriere-postgres", "pg_dump", "-U", "karriere_user", "karriere_db"]
-        with open(output_path, "wb") as f_out:
-            with gzip.open(f_out, "wb") as gz_out:
+        # Try direct host pg_dump first (works when pg_dump is installed on host)
+        pg_url = get_database_url()
+        if pg_url and shutil.which("pg_dump"):
+            # If pg_url uses docker hostname 'db', convert to localhost on host
+            host_url = pg_url.replace("@db:5432", "@localhost:5432")
+            cmd = ["pg_dump", "-d", host_url]
+            with open(output_path, "wb") as f_out, gzip.open(f_out, "wb") as gz_out:
                 p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = p.communicate()
-                if p.returncode != 0:
-                    # Fallback to local pg_dump if direct command fails
-                    logger.warning(f"Docker pg_dump failed: {stderr.decode('utf-8', errors='ignore')}")
-                    return False
-                gz_out.write(stdout)
-        return True
+                if p.returncode == 0 and stdout:
+                    gz_out.write(stdout)
+                    return True
+
+        # Fallback to docker exec if docker CLI is available
+        if shutil.which("docker"):
+            cmd = ["docker", "exec", "karriere-postgres", "pg_dump", "-U", "karriere_user", "karriere_db"]
+            with open(output_path, "wb") as f_out, gzip.open(f_out, "wb") as gz_out:
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = p.communicate()
+                if p.returncode == 0 and stdout:
+                    gz_out.write(stdout)
+                    return True
+                logger.warning(f"Docker pg_dump failed: {stderr.decode('utf-8', errors='ignore')}")
+
+        logger.error("[Backup] Neither host pg_dump nor docker exec succeeded.")
+        return False
     except Exception as e:
         logger.error(f"[Backup] Failed creating postgres dump: {e}")
         return False
@@ -152,3 +166,4 @@ def run_full_backup(send_alert: bool = True) -> dict:
 if __name__ == "__main__":
     res = run_full_backup(send_alert=False)
     print("Backup result:", res)
+
