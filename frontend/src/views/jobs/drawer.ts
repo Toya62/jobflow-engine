@@ -4,19 +4,10 @@ import type { JobRecord } from "../../api/types";
 import { ensureDescription } from "./description";
 import { jobDate } from "./filters";
 import { openEmailModal } from "../common/emailModal";
-import { onApplicationGenerated } from "../../events";
+import { onApplicationGenerated, requestGeneration } from "../../events";
+import { escapeHtml } from "../../utils";
 
-const ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-export function escapeHtml(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPE_MAP[char]);
-}
+export { escapeHtml };
 
 export interface Drawer {
   element: HTMLElement;
@@ -196,8 +187,7 @@ export function createDrawer(): Drawer {
           generateBtn.textContent = "Generating in background…";
           generateBtn.disabled = true;
         } else {
-          const genDrawer = (window as any).__jobGenDrawer;
-          if (genDrawer) genDrawer.open(job, "application");
+          requestGeneration({ job, tab: "application" });
         }
       });
 

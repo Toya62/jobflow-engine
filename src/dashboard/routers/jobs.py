@@ -285,13 +285,32 @@ def get_candidate_profile():
     try:
         from src.core import config
         p = config.load_candidate_profile()
+
+        # Parse structured work experience from experience_summary if present
+        import re
+        experiences = []
+        raw_summary = p.get("experience_summary", "")
+        for line in raw_summary.split("\n"):
+            line = line.strip()
+            if line.startswith("- "):
+                m = re.match(r"^-\s*([^,]+),\s*([^(]+)\s*\(([^)]+)\):\s*(.+)$", line)
+                if m:
+                    role, company, period, desc = m.groups()
+                    experiences.append({
+                        "role": role.strip(),
+                        "company": company.strip(),
+                        "period": period.strip(),
+                        "description": desc.strip(),
+                    })
+
         return {
             "personal_info": p.get("personal_info", {}),
             "education": p.get("education", []),
+            "experience": experiences,
             "skills": p.get("skills", {}),
             "languages": p.get("languages", {}),
             "projects": p.get("projects", []),
-            "experience_summary": p.get("experience_summary", ""),
+            "experience_summary": raw_summary,
             "job_search_preferences": p.get("job_search_preferences", {}),
             "integrity_status": "100% Verified Profile — AGENTS.md Single Source of Truth",
         }

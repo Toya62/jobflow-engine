@@ -4,23 +4,13 @@ import type { JobRecord } from "../../api/types";
 import { api } from "../../api/client";
 import { ensureDescription } from "./description";
 import { notifyApplicationGenerated } from "../../events";
+import { openEmailModal } from "../common/emailModal";
+import { escapeHtml } from "../../utils";
 
 export interface JobGenDrawer {
   element: HTMLElement;
-  open(job: JobRecord, initialTab?: "application" | "email"): void;
+  open(job: JobRecord): void;
   close(): void;
-}
-
-const ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (c) => ESCAPE_MAP[c]);
 }
 
 /** Backend publishes "complete"; older paths used "completed". Accept both. */
@@ -50,16 +40,11 @@ export function createJobGenDrawer(): JobGenDrawer {
         <h2 data-role="title" style="font-size:1.15rem; font-weight:700;">Generate Application</h2>
         <button type="button" class="kjc-drawer-close-btn" data-role="close" aria-label="Close">✕</button>
       </div>
-      <div class="kjc-drawer-tabs" data-role="tabs" style="display:flex; gap:6px; padding:8px 20px 0; border-bottom:1px solid var(--border-color); background:var(--bg-card);">
-        <button type="button" class="kjc-tab-btn active" data-tab="application" style="padding:10px 16px; background:none; border:none; border-bottom:2px solid var(--accent-brass, #e6a84f); color:var(--text-primary); cursor:pointer; font-weight:600; font-size:0.9rem;">📄 Application</button>
-        <button type="button" class="kjc-tab-btn" data-tab="email" style="padding:10px 16px; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); cursor:pointer; font-weight:600; font-size:0.9rem;">✉️ Draft Email</button>
-      </div>
       <div class="kjc-drawer-body" data-role="body"></div>
     </div>`;
 
   const titleEl = element.querySelector<HTMLElement>('[data-role="title"]');
   const bodyEl = element.querySelector<HTMLElement>('[data-role="body"]');
-  const tabsContainer = element.querySelector<HTMLElement>('[data-role="tabs"]');
 
   let currentJob: JobRecord | null = null;
   let tickTimer: number | null = null;
@@ -112,36 +97,12 @@ export function createJobGenDrawer(): JobGenDrawer {
       <div class="kjc-gen-status hidden" data-gen-status></div>
     </div>`;
 
-  const renderEmailForm = (job: JobRecord): string => `
-    <div class="kjc-gen-form">
-      <div class="kjc-gen-header">
-        <h3>${escapeHtml(job.title)}</h3>
-        <p class="kjc-gen-position">${escapeHtml(job.company)}</p>
-      </div>
-      <div class="kjc-gen-field">
-        <label>Recipient Email (Optional)</label>
-        <input type="email" data-gen-email placeholder="auto-detect from job description or URL" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); padding:9px 12px; border-radius:var(--radius-sm); font-size:0.87rem;" />
-      </div>
-      <div class="kjc-gen-actions">
-        <button type="button" class="kjc-btn kjc-btn-primary" data-gen-email-submit>✉️ Draft Application Email</button>
-        <button type="button" class="kjc-btn" data-gen-cancel>Cancel</button>
-      </div>
-      <div class="kjc-gen-status hidden" data-gen-email-status></div>
-    </div>`;
-
   const renderGenerating = (taskKey: string, status?: string, queuePos?: number): string => `
     <div class="kjc-gen-generating">
       <div class="kjc-gen-spinner"></div>
       <p>${status === "queued" ? `Waiting in queue (position #${queuePos || 1})…` : "Generating ATS-tailored application…"}</p>
       <p class="kjc-gen-task-key">Task: ${escapeHtml(taskKey)}</p>
       <div class="kjc-gen-progress" data-gen-progress>${status === "queued" ? "Waiting for turn..." : ""}</div>
-    </div>`;
-
-  const renderEmailGenerating = (): string => `
-    <div class="kjc-gen-generating">
-      <div class="kjc-gen-spinner"></div>
-      <p>Drafting tailored application email with AI…</p>
-      <p class="kjc-gen-task-key">Analyzing requirements and contact info…</p>
     </div>`;
 
   const renderResult = (raw: any): string => {
@@ -162,34 +123,6 @@ export function createJobGenDrawer(): JobGenDrawer {
       return renderGenerating(result.task_key, result.status, result.queue_position);
     }
     return `<div class="kjc-gen-result error">Error: ${escapeHtml(result.message || "Unknown error")}</div>`;
-  };
-
-  const renderEmailResult = (result: any): string => {
-    if (result?.success) {
-      return `
-        <div class="kjc-gen-result success" style="display:flex; flex-direction:column; gap:12px;">
-          <h4>✓ Email Drafted Successfully</h4>
-          ${result.recipient ? `
-            <div class="kjc-gen-field">
-              <label>Recipient</label>
-              <input type="text" readonly value="${escapeHtml(result.recipient)}" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); padding:7px 10px; border-radius:var(--radius-sm); font-size:0.87rem;" />
-            </div>` : `<p style="font-size:0.85rem; color:var(--text-muted);">No direct email found in description. You can specify recipient in your email app.</p>`}
-          <div class="kjc-gen-field">
-            <label>Subject</label>
-            <input type="text" readonly value="${escapeHtml(result.subject || '')}" id="kjc-email-subj" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); padding:7px 10px; border-radius:var(--radius-sm); font-size:0.87rem;" />
-          </div>
-          <div class="kjc-gen-field">
-            <label>Body</label>
-            <textarea readonly rows="12" id="kjc-email-body" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); padding:10px; border-radius:var(--radius-sm); font-size:0.85rem; font-family:var(--font-sans); line-height:1.5;">${escapeHtml(result.body || '')}</textarea>
-          </div>
-          <div class="kjc-gen-links" style="display:flex; gap:10px; margin-top:8px;">
-            ${result.mailto_url ? `<a href="${escapeHtml(result.mailto_url)}" target="_blank" class="kjc-btn kjc-btn-primary">📬 Open Mail App</a>` : ""}
-            <button type="button" class="kjc-btn" id="kjc-copy-email-btn">📋 Copy Email Body</button>
-            <button type="button" class="kjc-btn" data-role="redraft-email">Redraft</button>
-          </div>
-        </div>`;
-    }
-    return `<div class="kjc-gen-result error">Error: ${escapeHtml(result?.error || result?.message || "Could not draft email")}</div>`;
   };
 
   const pollStatus = (taskKey: string): void => {
@@ -217,7 +150,16 @@ export function createJobGenDrawer(): JobGenDrawer {
           }
           if (bodyEl) {
             bodyEl.innerHTML = renderResult(status);
-            bodyEl.querySelector("[data-role='switch-to-email']")?.addEventListener("click", () => switchTab("email"));
+            bodyEl.querySelector("[data-role='switch-to-email']")?.addEventListener("click", () => {
+              if (currentJob) {
+                close();
+                openEmailModal({
+                  company: currentJob.company,
+                  position: currentJob.title,
+                  job_url: currentJob.job_url,
+                });
+              }
+            });
           }
         }
       } catch { /* keep polling */ }
@@ -279,7 +221,16 @@ export function createJobGenDrawer(): JobGenDrawer {
             });
           }
           bodyEl.innerHTML = renderResult(result);
-          bodyEl.querySelector("[data-role='switch-to-email']")?.addEventListener("click", () => switchTab("email"));
+          bodyEl.querySelector("[data-role='switch-to-email']")?.addEventListener("click", () => {
+            if (currentJob) {
+              close();
+              openEmailModal({
+                company: currentJob.company,
+                position: currentJob.title,
+                job_url: currentJob.job_url,
+              });
+            }
+          });
         }
       } catch (error) {
         showError(`Error: ${error instanceof Error ? error.message : String(error)}`);
@@ -291,100 +242,13 @@ export function createJobGenDrawer(): JobGenDrawer {
     cancelBtn?.addEventListener("click", close);
   };
 
-  const wireEmailForm = (): void => {
-    if (!bodyEl) return;
-    const submitBtn = bodyEl.querySelector<HTMLButtonElement>("[data-gen-email-submit]");
-    const emailInput = bodyEl.querySelector<HTMLInputElement>("[data-gen-email]");
-    const statusEl = bodyEl.querySelector("[data-gen-email-status]");
-    const cancelBtn = bodyEl.querySelector("[data-gen-cancel]");
-
-    const showError = (message: string): void => {
-      if (!statusEl) return;
-      statusEl.classList.remove("hidden");
-      statusEl.textContent = message;
-    };
-
-    submitBtn?.addEventListener("click", async () => {
-      const target = currentJob;
-      if (!target) return;
-      if (statusEl) statusEl.classList.add("hidden");
-
-      try {
-        if (submitBtn) submitBtn.disabled = true;
-        bodyEl.innerHTML = renderEmailGenerating();
-
-        const description = await ensureDescription(target);
-        const email = emailInput?.value.trim() || undefined;
-
-        const result = await api.generateEmail({
-          company: String(target.company ?? ""),
-          position: String(target.title ?? ""),
-          description: description || "",
-          job_url: String(target.job_url ?? ""),
-          email,
-        });
-
-        if (currentJob !== target) return;
-        bodyEl.innerHTML = renderEmailResult(result);
-
-        const copyBtn = bodyEl.querySelector<HTMLButtonElement>("#kjc-copy-email-btn");
-        const bodyTextarea = bodyEl.querySelector<HTMLTextAreaElement>("#kjc-email-body");
-        copyBtn?.addEventListener("click", () => {
-          if (bodyTextarea?.value) {
-            void navigator.clipboard.writeText(bodyTextarea.value).then(() => {
-              const orig = copyBtn.textContent;
-              copyBtn.textContent = "✓ Copied!";
-              setTimeout(() => { copyBtn.textContent = orig; }, 2000);
-            });
-          }
-        });
-
-        bodyEl.querySelector("[data-role='redraft-email']")?.addEventListener("click", () => {
-          bodyEl.innerHTML = renderEmailForm(target);
-          wireEmailForm();
-        });
-      } catch (error) {
-        bodyEl.innerHTML = renderEmailForm(target);
-        wireEmailForm();
-        showError(`Error: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    });
-
-    cancelBtn?.addEventListener("click", close);
-  };
-
-  const switchTab = (tab: "application" | "email"): void => {
-    const tabButtons = tabsContainer?.querySelectorAll<HTMLButtonElement>(".kjc-tab-btn") || [];
-    tabButtons.forEach((btn) => {
-      const isTarget = btn.getAttribute("data-tab") === tab;
-      btn.classList.toggle("active", isTarget);
-      btn.style.borderBottomColor = isTarget ? "var(--accent-brass, #e6a84f)" : "transparent";
-      btn.style.color = isTarget ? "var(--text-primary)" : "var(--text-muted)";
-    });
-
-    if (!currentJob || !bodyEl) return;
-    if (tab === "application") {
-      bodyEl.innerHTML = renderAppForm(currentJob);
-      wireAppForm();
-    } else {
-      bodyEl.innerHTML = renderEmailForm(currentJob);
-      wireEmailForm();
-    }
-  };
-
-  tabsContainer?.querySelectorAll<HTMLButtonElement>(".kjc-tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const t = btn.getAttribute("data-tab") as "application" | "email";
-      if (t) switchTab(t);
-    });
-  });
-
-  const open = (job: JobRecord, initialTab: "application" | "email" = "application"): void => {
+  const open = (job: JobRecord): void => {
     stopPolling();
     currentJob = job;
     if (!titleEl || !bodyEl) return;
     titleEl.textContent = `${job.company ?? ""} — ${job.title ?? ""}`;
-    switchTab(initialTab);
+    bodyEl.innerHTML = renderAppForm(job);
+    wireAppForm();
     element.classList.remove("hidden");
   };
 

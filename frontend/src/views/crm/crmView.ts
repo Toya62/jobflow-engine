@@ -8,6 +8,7 @@ import { createBatchSelect } from "./batchSelect";
 import { filterRecords, toCsv } from "./filters";
 import { createCrmDrawer } from "./crmDrawer";
 import { onApplicationGenerated } from "../../events";
+import { escapeHtml } from "../../utils";
 
 const DEBOUNCE_MS = 200;
 const DEFAULT_VIEWPORT_HEIGHT = 480;
@@ -619,17 +620,6 @@ export async function mountCrmView(root: HTMLElement, initial: CrmUrlState): Pro
       colEl.appendChild(cardsContainer);
       boardEl.appendChild(colEl);
     });
-  }
-
-  function escapeHtml(text: string): string {
-    const map: Record<string, string> = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;",
-    };
-    return String(text || "").replace(/[&<>"']/g, (m) => map[m]);
   }
 
   function paint(keepScroll = false): void {

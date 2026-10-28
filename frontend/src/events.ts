@@ -3,6 +3,7 @@
 export const PIPELINE_EVENTS = {
   APPLICATION_GENERATED: "pipeline:application-generated",
   STATUS_UPDATED: "pipeline:status-updated",
+  GENERATION_REQUESTED: "pipeline:generation-requested",
 } as const;
 
 export interface ApplicationGeneratedDetail {
@@ -11,6 +12,36 @@ export interface ApplicationGeneratedDetail {
   taskKey?: string;
   cvPath?: string;
   coverPath?: string;
+}
+
+export interface GenerationRequestedDetail {
+  job: {
+    company: string;
+    title: string;
+    job_url?: string | null;
+    location?: string | null;
+    description?: string | null;
+  };
+  tab?: "application" | "email";
+}
+
+/** Emit event when generation is requested from another view (e.g. CRM). */
+export function requestGeneration(detail: GenerationRequestedDetail): void {
+  window.dispatchEvent(
+    new CustomEvent(PIPELINE_EVENTS.GENERATION_REQUESTED, { detail })
+  );
+}
+
+/** Subscribe to generation requests. */
+export function onGenerationRequested(
+  handler: (detail: GenerationRequestedDetail) => void
+): () => void {
+  const listener = (event: Event) => {
+    const custom = event as CustomEvent<GenerationRequestedDetail>;
+    if (custom.detail) handler(custom.detail);
+  };
+  window.addEventListener(PIPELINE_EVENTS.GENERATION_REQUESTED, listener);
+  return () => window.removeEventListener(PIPELINE_EVENTS.GENERATION_REQUESTED, listener);
 }
 
 /** Emit event when an application generation completes. */

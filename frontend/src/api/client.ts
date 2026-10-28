@@ -109,6 +109,21 @@ export const api = {
   pendingMatches: (max_age_days: number = 2) =>
     request<{ pending_count: number; max_age_days: number }>("/api/pending-matches", { max_age_days }),
   funnelStats: () => request<FunnelStatsResponse>("/api/funnel-stats"),
+  health: () => request<{
+    status: string;
+    database: {
+      type: string;
+      connected: boolean;
+      jobs_count: number;
+      applications_count: number;
+      prepared_count: number;
+      applied_count: number;
+      interview_count: number;
+      pending_evaluations: number;
+    };
+    ai_router?: any;
+    latest_run?: any;
+  }>("/api/health"),
   candidateProfile: () => request<CandidateProfileResponse>("/api/profile"),
   sync: () => request<unknown>("/api/sync"),
 };

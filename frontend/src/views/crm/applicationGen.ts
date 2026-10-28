@@ -3,6 +3,7 @@
 import type { TrackerRecord } from "../../api/types";
 import { api } from "../../api/client";
 import { notifyApplicationGenerated } from "../../events";
+import { escapeHtml } from "../../utils";
 
 export interface GenerationDrawer {
   element: HTMLElement;
@@ -10,14 +11,7 @@ export interface GenerationDrawer {
   close(): void;
 }
 
-export function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+export { escapeHtml };
 
 export function progressDots(nowMs: number): string {
   return ".".repeat(Math.floor(nowMs / 500) % 4);

@@ -2,18 +2,10 @@
 
 import type { TrackerRecord } from "../../api/types";
 import { openEmailModal } from "../common/emailModal";
+import { requestGeneration } from "../../events";
+import { escapeHtml } from "../../utils";
 
-const ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-export function escapeHtml(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPE_MAP[char]);
-}
+export { escapeHtml };
 
 export interface CrmDrawer {
   element: HTMLElement;
@@ -148,18 +140,16 @@ export function createCrmDrawer(): CrmDrawer {
       });
 
       generateBtn?.addEventListener("click", () => {
-        const genDrawer = (window as any).__jobGenDrawer;
-        if (genDrawer) {
-          genDrawer.open({
+        requestGeneration({
+          job: {
             company: record.company,
             title: record.position,
             job_url: record.job_url,
             location: record.location,
             description: record.description,
-          } as any, "application");
-        } else if (record.job_url) {
-          window.open(record.job_url, "_blank", "noopener,noreferrer");
-        }
+          },
+          tab: "application",
+        });
       });
 
       emailBtn?.addEventListener("click", () => {

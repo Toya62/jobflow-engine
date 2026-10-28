@@ -21,7 +21,7 @@ import { buildAiPrompt } from "./prompt";
 import { computeWindow } from "./virtualTable";
 import { ensureDescription } from "./description";
 import { flattenResult, isSuccessStatus } from "./jobGenDrawer";
-import { notifyApplicationGenerated, onApplicationGenerated } from "../../events";
+import { notifyApplicationGenerated, onApplicationGenerated, onGenerationRequested } from "../../events";
 
 const DEBOUNCE_MS = 200;
 const DEFAULT_VIEWPORT_HEIGHT = 480;
@@ -236,9 +236,10 @@ export async function mountJobsView(root: HTMLElement, initial: JobsUrlState): P
   shell?.appendChild(drawer.element);
   shell?.appendChild(jobGenDrawer.element);
 
-  // Expose the generation drawer so the detail drawer's "Generate CV" button
-  // can open it without a circular import.
-  (window as any).__jobGenDrawer = jobGenDrawer;
+  // Listen for cross-view generation requests (e.g. from CRM detail drawer)
+  onGenerationRequested((detail) => {
+    jobGenDrawer.open(detail.job as any);
+  });
 
   interface JobGenState {
     status: "idle" | "preparing" | "queued" | "running" | "ready" | "error";

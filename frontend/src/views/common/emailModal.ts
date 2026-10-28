@@ -1,18 +1,7 @@
 /** Dedicated centered popup modal for Email Drafting. */
 
 import { api } from "../../api/client";
-
-const ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (c) => ESCAPE_MAP[c]);
-}
+import { escapeHtml } from "../../utils";
 
 export interface EmailModalJob {
   company?: string | null;

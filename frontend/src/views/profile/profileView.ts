@@ -1,5 +1,6 @@
 import { api } from "../../api/client";
 import type { CandidateProfileResponse } from "../../api/types";
+import { escapeHtml } from "../../utils";
 
 export async function mountProfileView(root: HTMLElement): Promise<void> {
   root.innerHTML = `
@@ -22,7 +23,7 @@ export async function mountProfileView(root: HTMLElement): Promise<void> {
 }
 
 function renderProfile(container: HTMLElement, profile: CandidateProfileResponse): void {
-  const { personal_info, education, skills, projects, integrity_status } = profile;
+  const { personal_info, education, experience, skills, projects, integrity_status } = profile;
 
   container.innerHTML = `
     <!-- Hero / Profile Header -->
@@ -86,45 +87,53 @@ function renderProfile(container: HTMLElement, profile: CandidateProfileResponse
             Verified Experience History
           </div>
           <div style="padding-top: 0.5rem;">
-            <div class="kjc-timeline-item">
-              <div class="kjc-timeline-title">Research Assistant — Backend Systems &amp; Genomics ML</div>
-              <div class="kjc-timeline-meta">Example Company A • Oct 2025 – Sep 2026</div>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
-                REST APIs, GraphQL, Nextflow DSL2, stream processing, deep learning genomic pipelines. Authored EnsOrthoPOST ETL tool for cross-species ortholog extraction.
-              </p>
-            </div>
-
-            <div class="kjc-timeline-item">
-              <div class="kjc-timeline-title">Software Engineer Werkstudent — Assisted &amp; Automated Driving</div>
-              <div class="kjc-timeline-meta">Example Company B • Nov 2023 – Aug 2024</div>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
-                Python tooling, C++ diagnostic error analysis tool (DTC interpreter) for ECU fault code interpretation, MPCFlix Raspberry Pi embedded video device, Splunk log analysis, Jenkins CI/CD.
-              </p>
-            </div>
-
-            <div class="kjc-timeline-item">
-              <div class="kjc-timeline-title">Software Engineer Intern — Assisted &amp; Automated Driving</div>
-              <div class="kjc-timeline-meta">Example Company B • May – Oct 2023</div>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
-                Atlassian JIRA REST API automation for ticket cloning, internal diagnostic tools porting, ECU video test box analysis on Embedded Linux.
-              </p>
-            </div>
-
-            <div class="kjc-timeline-item">
-              <div class="kjc-timeline-title">Software Developer Werkstudent</div>
-              <div class="kjc-timeline-meta">Example Company C Solutions GmbH • Jul 2022 – May 2023</div>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
-                Python and C++ Qt GUI applications, automated testing, CI/CD pipelines, and cross-functional Agile engineering.
-              </p>
-            </div>
-
-            <div class="kjc-timeline-item" style="border-left-color: transparent;">
-              <div class="kjc-timeline-title">Security Analyst</div>
-              <div class="kjc-timeline-meta">Example Company D • Jan 2021 – Jan 2022</div>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
-                OWASP pentesting for web &amp; mobile, ELK/Kibana SIEM log analysis, Prometheus/Grafana infrastructure monitoring, network security policies.
-              </p>
-            </div>
+            ${(experience && experience.length > 0)
+              ? experience.map((exp, idx) => `
+                <div class="kjc-timeline-item" ${idx === experience.length - 1 ? 'style="border-left-color: transparent;"' : ''}>
+                  <div class="kjc-timeline-title">${escapeHtml(exp.role)}</div>
+                  <div class="kjc-timeline-meta">${escapeHtml(exp.company)} • ${escapeHtml(exp.period)}</div>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
+                    ${escapeHtml(exp.description)}
+                  </p>
+                </div>
+              `).join("")
+              : `
+                <div class="kjc-timeline-item">
+                  <div class="kjc-timeline-title">Research Assistant — Backend Systems &amp; Genomics ML</div>
+                  <div class="kjc-timeline-meta">Hochschule Koblenz • Oct 2025 – Sep 2026</div>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
+                    REST APIs, GraphQL, Nextflow DSL2, stream processing, deep learning genomic pipelines. Authored EnsOrthoPOST ETL tool for cross-species ortholog extraction.
+                  </p>
+                </div>
+                <div class="kjc-timeline-item">
+                  <div class="kjc-timeline-title">Software Engineer Werkstudent — Assisted &amp; Automated Driving</div>
+                  <div class="kjc-timeline-meta">Bosch Engineering • Nov 2023 – Aug 2024</div>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
+                    Python tooling, C++ diagnostic error analysis tool (DTC interpreter) for ECU fault code interpretation, MPCFlix Raspberry Pi embedded video device, Splunk log analysis, Jenkins CI/CD.
+                  </p>
+                </div>
+                <div class="kjc-timeline-item">
+                  <div class="kjc-timeline-title">Software Engineer Intern — Assisted &amp; Automated Driving</div>
+                  <div class="kjc-timeline-meta">Bosch Engineering • May – Oct 2023</div>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
+                    Atlassian JIRA REST API automation for ticket cloning, internal diagnostic tools porting, ECU video test box analysis on Embedded Linux.
+                  </p>
+                </div>
+                <div class="kjc-timeline-item">
+                  <div class="kjc-timeline-title">Software Developer Werkstudent</div>
+                  <div class="kjc-timeline-meta">REMONDIS • Jul 2022 – May 2023</div>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
+                    Python and C++ Qt GUI applications, automated testing, CI/CD pipelines, and cross-functional Agile engineering.
+                  </p>
+                </div>
+                <div class="kjc-timeline-item" style="border-left-color: transparent;">
+                  <div class="kjc-timeline-title">Security Analyst</div>
+                  <div class="kjc-timeline-meta">CloudSewa • Jan 2021 – Jan 2022</div>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;">
+                    OWASP pentesting for web &amp; mobile, ELK/Kibana SIEM log analysis, Prometheus/Grafana infrastructure monitoring, network security policies.
+                  </p>
+                </div>
+              `}
           </div>
         </section>
 
@@ -190,15 +199,4 @@ function renderProfile(container: HTMLElement, profile: CandidateProfileResponse
       </div>
     </div>
   `;
-}
-
-function escapeHtml(text: string): string {
-  const map: Record<string, string> = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  };
-  return String(text).replace(/[&<>"']/g, (m) => map[m]);
 }

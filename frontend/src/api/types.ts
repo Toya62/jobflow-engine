@@ -185,6 +185,12 @@ export interface CandidateProfileResponse {
     graduation_year: string;
     details: string;
   }>;
+  experience?: Array<{
+    role: string;
+    company: string;
+    period: string;
+    description: string;
+  }>;
   skills: Record<string, string[] | string>;
   languages: Record<string, string>;
   projects: Array<{
