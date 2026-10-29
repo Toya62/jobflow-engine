@@ -32,25 +32,34 @@ TRACKER_COLUMNS = [
 def load_tracker_df() -> pd.DataFrame:
     """Load the CRM tracker view (applications joined to their job).
 
-    The SELECT list is built dynamically from ``PRAGMA table_info`` so an older
-    database that predates the ``sent_at`` / ``follow_up_at`` columns still loads
-    instead of erroring out and silently returning an empty frame.
+    The SELECT list is built dynamically from SQLite PRAGMA or PostgreSQL information_schema
+    so an older database that predates the sent_at / follow_up_at columns still loads.
     """
     db_path = os.path.join('data', 'karriere.db')
     if is_postgres() or os.path.exists(db_path):
         try:
             conn = get_db_connection(db_path)
-            # Probe available columns; fall back to the legacy projection.
             extra_cols = []
             try:
                 cursor = conn.cursor()
-                cursor.execute("PRAGMA table_info(applications)")
-                cols = {r[1] for r in cursor.fetchall()}
+                if is_postgres():
+                    cursor.execute("""
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_name = 'applications'
+                    """)
+                    cols = {r[0] for r in cursor.fetchall()}
+                else:
+                    cursor.execute("PRAGMA table_info(applications)")
+                    cols = {r[1] for r in cursor.fetchall()}
+
                 for name in ("sent_at", "sent_method", "sent_to", "follow_up_at"):
                     if name in cols:
                         extra_cols.append(name)
             except Exception:
-                pass
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
             select_extra = ", ".join(f"a.{c}" for c in extra_cols)
             q = f'''
@@ -234,11 +243,22 @@ def upsert_tracker_row(company: str, position: str, job_url: str = "",
         # Inspect available columns on applications to support test schemas or older databases
         has_new_cols = True
         try:
-            cursor.execute("PRAGMA table_info(applications)")
-            cols = {r[1] for r in cursor.fetchall()}
+            if is_postgres():
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'applications'
+                """)
+                cols = {r[0] for r in cursor.fetchall()}
+            else:
+                cursor.execute("PRAGMA table_info(applications)")
+                cols = {r[1] for r in cursor.fetchall()}
             if cols and "sent_at" not in cols:
                 has_new_cols = False
         except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             pass
 
         if has_new_cols:
