@@ -16,6 +16,7 @@ def _get_ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context()
 
 import urllib.parse
+import threading
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("ai_router")
@@ -25,17 +26,17 @@ NON_RETRYABLE_STATUSES = frozenset({401, 402, 403, 404})
 
 class AIRouter:
     def __init__(self):
+        self._lock = threading.Lock()
         self.keys = self._load_keys()
         self.gemini_key_index = 0
         self.gemini_consecutive_failures = 0
         self.gemini_cooldown_until = 0.0
         self.preferred_gemini_models = [
-            "gemini-3.5-flash-lite",
             "gemini-3-flash-preview",
+            "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite-preview",
         ]
         self.groq_models = [
-            "openai/gpt-oss-20b",
             "openai/gpt-oss-120b",
             "qwen/qwen3.8-27b",
         ]
@@ -131,13 +132,14 @@ class AIRouter:
         return keys
 
     def _get_next_gemini_key(self) -> Optional[str]:
-        gemini_keys = self.keys.get("gemini", [])
-        if not gemini_keys:
-            return None
-        live_keys = [k for k in gemini_keys if k not in self._dead_gemini_keys] or gemini_keys
-        key = live_keys[self.gemini_key_index % len(live_keys)]
-        self.gemini_key_index += 1
-        return key
+        with self._lock:
+            gemini_keys = self.keys.get("gemini", [])
+            if not gemini_keys:
+                return None
+            live_keys = [k for k in gemini_keys if k not in self._dead_gemini_keys] or gemini_keys
+            key = live_keys[self.gemini_key_index % len(live_keys)]
+            self.gemini_key_index += 1
+            return key
 
     def generate_content(self, prompt: str, schema: Optional[Dict[str, Any]] = None, preferred_model: Optional[str] = None) -> str:
         """
@@ -245,7 +247,7 @@ class AIRouter:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         
-        with urllib.request.urlopen(req, timeout=30, context=_get_ssl_context()) as resp:
+        with urllib.request.urlopen(req, timeout=12, context=_get_ssl_context()) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
             candidates = resp_data.get("candidates", [])
             if candidates:
@@ -259,7 +261,7 @@ class AIRouter:
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
-            "User-Agent": "curl/7.88.1"
+            "User-Agent": "Mozilla/5.0"
         }
         payload: Dict[str, Any] = {
             "model": model,
@@ -275,7 +277,7 @@ class AIRouter:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers)
         
-        with urllib.request.urlopen(req, timeout=30, context=_get_ssl_context()) as resp:
+        with urllib.request.urlopen(req, timeout=12, context=_get_ssl_context()) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
             choices = resp_data.get("choices", [])
             if choices:
@@ -301,7 +303,7 @@ class AIRouter:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers)
         
-        with urllib.request.urlopen(req, timeout=30, context=_get_ssl_context()) as resp:
+        with urllib.request.urlopen(req, timeout=12, context=_get_ssl_context()) as resp:
             resp_data = json.loads(resp.read().decode("utf-8"))
             choices = resp_data.get("choices", [])
             if choices:
@@ -358,6 +360,12 @@ def route_ai_evaluation(system_prompt: str, user_prompt: str, preferred_model: O
             
         # Strip trailing commas before closing braces/brackets
         cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
+
+        # Fix truncated JSON: close unclosed quotes/braces if model got cut off
+        if not cleaned.endswith("}"):
+            if cleaned.count('"') % 2 != 0:
+                cleaned += '"'
+            cleaned += "}"
 
         parsed = json.loads(cleaned)
         if isinstance(parsed, dict):

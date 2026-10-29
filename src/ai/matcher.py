@@ -15,6 +15,8 @@ import sys
 import json
 import time
 import argparse
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 from datetime import datetime, timedelta
 try:
@@ -500,11 +502,12 @@ def run_auto_matching_on_latest(
 def run_gemini_matcher_on_db(
     model_name: str = "gemini-3.5-flash-lite",
     limit: int | None = None,
-    rate_limit_delay: float = 4.1,
+    rate_limit_delay: float = 0.5,
     db_path: str = "data/karriere.db",
     min_job_id: int | None = None,
     portal: str | None = None,
     max_age_days: int | None = None,
+    concurrency: int = 4,
 ) -> list:
     """Evaluates pending/unevaluated jobs directly from database (PostgreSQL / SQLite).
 
@@ -582,39 +585,39 @@ def run_gemini_matcher_on_db(
     prefilter_count = 0
     failed_count = 0
 
-    for idx, (_, row) in enumerate(df.iterrows(), 1):
-        row_dict = row.to_dict()
-        row_dict["job_id"] = row["id"]  # explicitly assign job_id from SQLite primary key
+    results_lock = threading.Lock()
+    processed_count = 0
+
+    def _process_job(row_item):
+        nonlocal processed_count, gemini_count, fallback_count, prefilter_count, failed_count
+        idx_local, row_data = row_item
+        row_dict = row_data.to_dict()
+        row_dict["job_id"] = row_data["id"]
+
         res = evaluate_single_job(row_dict, client=client, model_name=model_name)
+        with results_lock:
+            processed_count += 1
+            curr_idx = processed_count
+
         if not res:
-            failed_count += 1
+            with results_lock:
+                failed_count += 1
             title = str(row_dict.get('title', 'Unknown'))[:40]
             company = str(row_dict.get('company', 'Unknown'))[:25]
-            print(f"[{idx}/{total_jobs}] ⚠️ {company} - {title}: FAILED_AI_EVALUATION")
-            router_status = get_router_status()
-            if router_status.get("all_disabled"):
-                msg = (f"All AI providers are disabled (non-retryable errors: {router_status.get('disabled_providers')}). "
-                       f"Aborting matching batch after {idx}/{total_jobs} jobs.")
-                logger.error(msg)
-                print(f"⛔ {msg}")
-                try:
-                    from src.core.notifier import send_telegram_alert
-                    send_telegram_alert(f"⚠️ *AI Matcher Aborted*\n\n{msg}")
-                except Exception as e:
-                    logger.warning(f"Could not send Telegram alert for aborted matcher: {e}")
-                break
-            continue
+            print(f"[{curr_idx}/{total_jobs}] ⚠️ {company} - {title}: FAILED_AI_EVALUATION")
+            return None
 
         prov = res.get("_ai_provider", "gemini")
-        if prov.startswith("gemini"):
-            gemini_count += 1
-            prov_tag = "Gemini"
-        elif prov in ("prefilter", "blacklist"):
-            prefilter_count += 1
-            prov_tag = "Rule Filter"
-        else:
-            fallback_count += 1
-            prov_tag = f"Fallback: {prov}"
+        with results_lock:
+            if prov.startswith("gemini"):
+                gemini_count += 1
+                prov_tag = "Gemini"
+            elif prov in ("prefilter", "blacklist"):
+                prefilter_count += 1
+                prov_tag = "Rule Filter"
+            else:
+                fallback_count += 1
+                prov_tag = f"Fallback: {prov}"
 
         is_approved = res.get("is_approved", False) or str(res.get("status", "")).startswith("APPROVED")
         status = res.get("status", res.get("gemini_status", "REJECTED_TECH_MISMATCH"))
@@ -636,30 +639,45 @@ def run_gemini_matcher_on_db(
             "evaluated_at": res.get("evaluated_at", get_german_timestamp_str())
         }
 
-        save_evaluations_to_db([enriched_record], db_path=db_path)
-        title = str(row_dict.get('title', 'Unknown'))[:40]
-        company = str(row_dict.get('company', 'Unknown'))[:25]
-        if is_approved or status in ("APPROVED", "MANUAL_REVIEW"):
-            print(f"[{idx}/{total_jobs}] 🟢 {company} - {title}: APPROVED ({score}%) [{prov_tag}]")
-            approved_list.append(enriched_record)
-        else:
-            print(f"[{idx}/{total_jobs}] 🔴 {company} - {title}: {status} [{prov_tag}]")
-            rejected_list.append(enriched_record)
+        with results_lock:
+            try:
+                save_evaluations_to_db([enriched_record], db_path=db_path)
+            except Exception as e:
+                logger.error(f"Failed to save real-time evaluation for job {row_dict.get('job_id')}: {e}")
 
-        # Persist immediately to DB so pending counts and other processes reflect real-time progress
-        try:
-            save_evaluations_to_db([enriched_record], db_path=db_path)
-        except Exception as e:
-            logger.error(f"Failed to save real-time evaluation for job {row_dict.get('job_id')}: {e}")
+            title = str(row_dict.get('title', 'Unknown'))[:40]
+            company = str(row_dict.get('company', 'Unknown'))[:25]
+            if is_approved or status in ("APPROVED", "MANUAL_REVIEW"):
+                print(f"[{curr_idx}/{total_jobs}] 🟢 {company} - {title}: APPROVED ({score}%) [{prov_tag}]")
+                approved_list.append(enriched_record)
+            else:
+                print(f"[{curr_idx}/{total_jobs}] 🔴 {company} - {title}: {status} [{prov_tag}]")
+                rejected_list.append(enriched_record)
 
-        if idx < total_jobs and rate_limit_delay > 0:
+        if rate_limit_delay > 0:
             time.sleep(rate_limit_delay)
+        return enriched_record
 
-    # Save results directly to SQLite evaluations table
-    if approved_list:
-        save_evaluations_to_db(approved_list, db_path=db_path)
-    if rejected_list:
-        save_evaluations_to_db(rejected_list, db_path=db_path)
+    items = list(enumerate((row for _, row in df.iterrows()), 1))
+    max_workers = min(concurrency, max(1, len(items)))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_process_job, item) for item in items]
+        for f in as_completed(futures):
+            # check router circuit breaker
+            router_status = get_router_status()
+            if router_status.get("all_disabled"):
+                msg = (f"All AI providers disabled ({router_status.get('disabled_providers')}). "
+                       f"Aborting batch after {processed_count}/{total_jobs} jobs.")
+                logger.error(msg)
+                print(f"⛔ {msg}")
+                try:
+                    from src.core.notifier import send_telegram_alert
+                    send_telegram_alert(f"⚠️ *AI Matcher Aborted*\n\n{msg}")
+                except Exception as e:
+                    logger.warning(f"Could not send Telegram alert: {e}")
+                executor.shutdown(wait=False, cancel_futures=True)
+                break
 
     print(f"\n{'='*60}")
     print(f"  AI Job Matching on {db_label} Complete")
