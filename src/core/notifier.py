@@ -105,9 +105,14 @@ def notify_scrape_summary(
     portal: str = "all",
     run_approved_count: int = 0,
     run_new_count: int = 0,
-    portal_breakdown: dict = None
+    portal_breakdown: dict = None,
+    suppress_empty: bool = True,
 ) -> bool:
     """Format and send a structured scrape & match notification with German Local Time (CEST/CET)."""
+    if suppress_empty and run_approved_count == 0 and run_new_count == 0:
+        logger.info("[Telegram] Zero fresh jobs and zero approved in this run; summary alert suppressed.")
+        return True
+
     german_time_str = datetime.now(GERMAN_TZ).strftime("%d.%m.%Y, %H:%M CEST")
 
     breakdown_lines = []

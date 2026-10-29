@@ -370,17 +370,20 @@ def handle_scrape(args):
             json.dump(summary_data, f, indent=2)
         print(f"✓ Run summary written to data/latest_run_summary.json: {total_run_approved} approved, {total_run_scraped} scraped")
         
-        # Dispatch structured Telegram notification for completed batch
+        # Dispatch structured Telegram notification for completed batch (only if fresh activity)
         try:
-            from src.core.notifier import notify_scrape_summary
-            notify_scrape_summary(
-                new_jobs_count=total_run_scraped,
-                approved_count=total_run_approved,
-                portal=portal,
-                run_approved_count=total_run_approved,
-                run_new_count=total_run_scraped,
-                portal_breakdown=portal_breakdown,
-            )
+            if total_run_scraped > 0 or total_run_approved > 0:
+                from src.core.notifier import notify_scrape_summary
+                notify_scrape_summary(
+                    new_jobs_count=total_run_scraped,
+                    approved_count=total_run_approved,
+                    portal=portal,
+                    run_approved_count=total_run_approved,
+                    run_new_count=total_run_scraped,
+                    portal_breakdown=portal_breakdown,
+                )
+            else:
+                print("✓ 0 fresh jobs and 0 approved jobs; suppressing Telegram alert to avoid noise.")
         except Exception as notify_err:
             print(f"[Warning] Telegram summary dispatch error: {notify_err}")
     except Exception as e:

@@ -192,3 +192,32 @@ def test_sqlite_evaluations_saved_directly_without_csv(monkeypatch, tmp_path):
     assert csv_files == []
 
 
+def test_telegram_scrape_summary_suppresses_empty_runs(monkeypatch):
+    from src.core import notifier
+
+    dispatched = []
+    monkeypatch.setattr(notifier, "send_telegram_alert", lambda msg: (dispatched.append(msg), True)[1])
+
+    # 1. Zero activity with default suppress_empty=True -> should NOT dispatch
+    res = notifier.notify_scrape_summary(
+        new_jobs_count=0,
+        approved_count=0,
+        run_approved_count=0,
+        run_new_count=0,
+    )
+    assert res is True
+    assert len(dispatched) == 0
+
+    # 2. Activity present -> should dispatch
+    res = notifier.notify_scrape_summary(
+        new_jobs_count=5,
+        approved_count=2,
+        run_approved_count=2,
+        run_new_count=5,
+    )
+    assert res is True
+    assert len(dispatched) == 1
+    assert "+2" in dispatched[0]
+
+
+
