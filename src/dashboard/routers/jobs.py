@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api", tags=["jobs"])
 DB_PATH = os.path.join('data', 'karriere.db')
 
 DATASET_VIEWS = [
+    'ungenerated_approved',
     'ai_approved',
     'all_combined',
     'best_jobs',
@@ -203,7 +204,17 @@ def list_jobs(
         FROM jobs j
         '''
 
-        if 'all_combined' in raw_dataset:
+        if 'ungenerated_approved' in raw_dataset or 'pending_generation' in raw_dataset:
+            q = base_select + '''
+            JOIN evaluations e ON e.job_id = j.id
+            LEFT JOIN applications a ON a.job_id = j.id
+            WHERE e.status LIKE 'APPROVED%' 
+              AND e.score >= 85
+              AND e.status != 'USER_DISMISSED'
+              AND (a.id IS NULL OR a.cv_pdf_path IS NULL OR a.cv_pdf_path = '')
+            ORDER BY e.score DESC, j.id DESC
+            '''
+        elif 'all_combined' in raw_dataset:
             q = base_select + '''
             LEFT JOIN evaluations e ON e.job_id = j.id
             WHERE COALESCE(e.status, '') != 'USER_DISMISSED'

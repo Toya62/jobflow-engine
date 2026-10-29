@@ -997,13 +997,30 @@ function paintModeButtons(): void {
 
   paintHead();
   paintModeButtons();
+  function formatDatasetLabel(name: string): string {
+    switch (name) {
+      case "ungenerated_approved":
+        return "⚡ Ungenerated Approved (85%+)";
+      case "ai_approved":
+        return "🟢 All Approved";
+      case "best_jobs":
+        return "⭐ Best Jobs (40%+)";
+      case "filtered_out":
+        return "🔴 Disqualified";
+      case "all_combined":
+        return "📋 All Combined (DB)";
+      default:
+        return name.toUpperCase();
+    }
+  }
+
   try {
     const datasets = await api.datasets();
     datasetSelect.replaceChildren(
       ...datasets.map((name) => {
         const option = element("option");
         option.value = name;
-        option.textContent = name;
+        option.textContent = formatDatasetLabel(name);
         return option;
       }),
     );
