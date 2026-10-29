@@ -33,8 +33,7 @@ class AIRouter:
         self.gemini_cooldown_until = 0.0
         self.preferred_gemini_models = [
             "gemini-3-flash-preview",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite-preview",
+            "gemini-3.1-flash-lite",
         ]
         self.groq_models = [
             "openai/gpt-oss-120b",
