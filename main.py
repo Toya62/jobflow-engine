@@ -533,8 +533,8 @@ def main():
     )
     match_parser.add_argument(
         "--model",
-        default="gemini-3.5-flash-lite",
-        help="Gemini model ID (default: gemini-3.5-flash-lite)"
+        default="gemini-3-flash-preview",
+        help="Gemini model ID (default: gemini-3-flash-preview)"
     )
     match_parser.add_argument(
         "--limit",
@@ -545,8 +545,8 @@ def main():
     match_parser.add_argument(
         "--delay",
         type=float,
-        default=4.1,
-        help="Delay between API calls in seconds (default: 4.1 for 15 RPM free tier)"
+        default=1.0,
+        help="Delay between API calls in seconds (default: 1.0)"
     )
     match_parser.add_argument(
         "--portal",
