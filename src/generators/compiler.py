@@ -342,15 +342,18 @@ def generate_application_package(
         language = "en" if is_en else "de"
 
     # Clean slug for filenames
-    def slugify(text: str) -> str:
+    def slugify(text: str, max_len: int = 35) -> str:
         s = text.lower().strip()
-        s = re.sub(r'\s*\(?(?:m/w/d|m/f/d|d/m/w|w/m/d|all genders?|gn)\)?\s*', ' ', s, flags=re.IGNORECASE)
+        s = re.sub(r'\s*\(?\s*(?:m/w/d|m/f/d|d/m/w|w/m/d|all genders?|gn)\s*\)?\s*', ' ', s, flags=re.IGNORECASE)
+        s = re.sub(r'(?:gmbh|ag|se|co\.?\s*kg|inc|corp|ltd)', '', s)
         s = re.sub(r'[^a-z0-9]+', '-', s).strip('-')
-        return s[:40]
+        return s[:max_len].rstrip('-') if s else "unknown"
 
-    comp_slug = slugify(company)
-    role_slug = slugify(title)
+    comp_slug = slugify(company, max_len=30)
+    role_slug = slugify(title, max_len=35)
     base_name = f"{comp_slug}_{role_slug}"
+    if len(base_name) > 65:
+        base_name = base_name[:65].rstrip('-')
 
     cv_tex_path = os.path.join(app_dir, f"{base_name}_cv.tex")
     cover_tex_path = os.path.join(app_dir, f"{base_name}_cover.tex")

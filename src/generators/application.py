@@ -77,12 +77,15 @@ TEMPLATE_ARCHETYPES = {
 }
 
 
-def _slugify(text: str) -> str:
-    """Convert text to a filesystem-safe slug."""
+def _slugify(text: str, max_len: int = 35) -> str:
+    """Convert text to a filesystem-safe slug, stripped of company/gender noise."""
     if not text:
         return "unknown"
-    slug = re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')
-    return slug[:60] if slug else "unknown"
+    s = text.lower().strip()
+    s = re.sub(r'\s*\(?\s*(?:m/w/d|w/m/d|f/m/d|d/m/w|m/f/d|all genders?|gn)\s*\)?\s*', ' ', s, flags=re.IGNORECASE)
+    s = re.sub(r'\b(?:gmbh|ag|se|co\.?\s*kg|inc|corp|ltd)\b', '', s)
+    slug = re.sub(r'[^a-z0-9]+', '-', s).strip('-')
+    return slug[:max_len].rstrip('-') if slug else "unknown"
 
 
 def _detect_language(title: str = "", description: str = "") -> str:
@@ -460,9 +463,12 @@ def generate_application(
         date_dir = os.path.join(APPLICATIONS_DIR, today)
         os.makedirs(date_dir, exist_ok=True)
 
-        comp_slug = _slugify(company)
-        pos_slug = _slugify(position)
+        comp_slug = _slugify(company, max_len=30)
+        pos_slug = _slugify(position, max_len=35)
         base_name = f"{comp_slug}_{pos_slug}"
+        # Hard cap: ensure full filename including '_cover.pdf' (10 chars) never exceeds 75 chars (< 90 chars ATS portal limit)
+        if len(base_name) > 65:
+            base_name = base_name[:65].rstrip('-')
 
         cv_tex_path = os.path.join(date_dir, f"{base_name}_cv.tex")
         cover_tex_path = os.path.join(date_dir, f"{base_name}_cover.tex")

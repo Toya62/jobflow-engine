@@ -114,9 +114,11 @@ def generate_application(body: GenerateApplicationRequest):
         from src.generators.application import _slugify
 
         today = datetime.now().strftime("%Y-%m-%d")
-        comp_slug = _slugify(company)
-        pos_slug = _slugify(position)
+        comp_slug = _slugify(company, max_len=30)
+        pos_slug = _slugify(position, max_len=35)
         base_name = f"{comp_slug}_{pos_slug}"
+        if len(base_name) > 65:
+            base_name = base_name[:65].rstrip('-')
         task_key = base_name
 
         existing_cv = os.path.join('applications', today, f"{base_name}_cv.pdf")
