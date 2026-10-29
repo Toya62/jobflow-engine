@@ -72,6 +72,55 @@ def _normalize_company(s: str) -> str:
 def _has_desc(d: str) -> bool:
     return bool(str(d).strip())
 
+
+_REQ_ID_RE = re.compile(
+    r"(?:referenzcode|kennziffer|referenznummer|stellennummer|referenz-nr\.?)[^0-9\n]{0,50}?([0-9]{4,}[-_][0-9]{2,})",
+    re.I
+)
+
+def _extract_req_id(desc: str) -> str | None:
+    """Extracts base requisition/reference code from job description text (e.g. 20261895 from 20261895_0002)."""
+    if not desc or not isinstance(desc, str):
+        return None
+    clean = desc.replace("\\", "")
+    m = _REQ_ID_RE.search(clean)
+    if m:
+        full_code = m.group(1)
+        base = full_code.split("_")[0].split("-")[0]
+        return base if len(base) >= 4 else None
+    return None
+
+
+_GENDER_NOISE_RE = re.compile(
+    r"\(?\b(?:m/w/d|w/m/d|d/m/w|m/f/d|w/m/i|gn|all genders)\)?|[/:\*](?:in|r)\b",
+    re.I
+)
+_TITLE_STOPWORDS = {
+    "im", "bereich", "für", "fuer", "und", "von", "in", "m", "w", "d",
+    "mitarbeiterin", "mitarbeiter", "wissenschaftliche", "wissenschaftlicher"
+}
+
+def _extract_title_tokens(title: str) -> set[str]:
+    """Extracts clean semantic keyword tokens from a job title, removing gender tags and boilerplate."""
+    if not title:
+        return set()
+    s = _GENDER_NOISE_RE.sub(" ", str(title).lower())
+    s = re.sub(r"[^a-z0-9äöüß]+", " ", s)
+    return {w for w in s.split() if len(w) > 2 and w not in _TITLE_STOPWORDS}
+
+
+def _extract_location_key(location: str) -> str:
+    """Extracts 5-digit postal code or normalized primary city name for location matching."""
+    if not location:
+        return ""
+    s = str(location).lower().strip()
+    m = re.search(r"\b(\d{5})\b", s)
+    if m:
+        return m.group(1)
+    parts = [p.strip() for p in re.split(r"[,/]", s) if p.strip()]
+    return parts[0] if parts else ""
+
+
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone
 

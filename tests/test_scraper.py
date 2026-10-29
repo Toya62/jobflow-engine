@@ -58,7 +58,31 @@ def test_compute_score_date_freshness():
     assert _compute_score("NaT") == 0
 
     # Real fresh date (< 24h)
-    now_iso = datetime.now(tz=timezone.utc).isoformat()
-    score = _compute_score(now_iso)
-    assert score >= 40, f"Expected high score for fresh date, got {score}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    assert _compute_score(now_iso) >= 40
+
+
+def test_cross_portal_dedup_requisition_and_location():
+    from src.db.file_io import dedup
+
+    df = pd.DataFrame([
+        {
+            "company": "Bundesanstalt für Straßen- und Verkehrswesen",
+            "title": "Wissenschaftliche Mitarbeiterin / Wissenschaftlicher Mitarbeiter (m/w/d) im Bereich Mobilitätserhebungen und Analyse von Alltagsmobilität",
+            "location": "51427 Bergisch Gladbach",
+            "job_url": "https://service.bund.de/123",
+            "description": "Ausschreibung Referenzcode der Ausschreibung 20261895_0002"
+        },
+        {
+            "company": "BAV Dienstsitz Aurich",
+            "title": "wissenschaftliche/r Mitarbeiter/in (m/w/d) Mobilitätserhebungen und Analyse von Alltagsmobilität",
+            "location": "Bergisch Gladbach 51427",
+            "job_url": "https://arbeitsagentur.de/456",
+            "description": "BAV Dienstsitz Aurich Referenzcode der Ausschreibung 20261895\\_9300**"
+        }
+    ])
+    res = dedup(df)
+    assert len(res) == 1
+    assert "Bundesanstalt" in res.iloc[0]["company"] or "BAV" in res.iloc[0]["company"]
+
 

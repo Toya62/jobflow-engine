@@ -879,7 +879,7 @@ def filter_against_existing_catalog(
     2. Normalized (title + company) composite key
     3. Description fingerprint hash
     """
-    from src.core.utils import _normalize_company, _norm, _plain_url
+    from src.core.utils import _normalize_company, _norm, _plain_url, _extract_req_id
 
     before = len(df)
     if before == 0:
@@ -888,6 +888,7 @@ def filter_against_existing_catalog(
     seen_urls: set[str] = set()
     seen_title_company: set[str] = set()
     seen_fingerprints: set[str] = set()
+    seen_req_ids: set[str] = set()
 
     # 1. Primary Source of Truth: Database (PostgreSQL / SQLite)
     from src.db.database import get_db_connection, is_postgres
@@ -909,6 +910,9 @@ def filter_against_existing_catalog(
                     fp = _desc_fingerprint(str(d).strip())
                     if fp and len(fp) > 50:
                         seen_fingerprints.add(fp)
+                    req_id = _extract_req_id(str(d))
+                    if req_id:
+                        seen_req_ids.add(req_id)
             conn.close()
         except Exception as exc:
             logger.warning(f"Could not load existing jobs from DB {db_path}: {exc}")
@@ -945,7 +949,7 @@ def filter_against_existing_catalog(
                 if t and c:
                     seen_title_company.add(f"{t}|||{c}")
 
-        # 3. Collect description fingerprints
+        # 3. Collect description fingerprints & requisition IDs
         if "description" in cat_df.columns:
             for d in cat_df["description"].dropna().astype(str):
                 d_str = d.strip()
@@ -953,6 +957,9 @@ def filter_against_existing_catalog(
                     fp = _desc_fingerprint(d_str)
                     if fp and len(fp) > 50:
                         seen_fingerprints.add(fp)
+                    req_id = _extract_req_id(d_str)
+                    if req_id:
+                        seen_req_ids.add(req_id)
 
     df = df.copy()
 
@@ -968,9 +975,12 @@ def filter_against_existing_catalog(
         if t and c and f"{t}|||{c}" in seen_title_company:
             return True
 
-        # Check Description Fingerprint
+        # Check Requisition ID and Description Fingerprint
         desc = str(row.get("description", "") or "").strip()
         if desc:
+            req_id = _extract_req_id(desc)
+            if req_id and req_id in seen_req_ids:
+                return True
             fp = _desc_fingerprint(desc)
             if fp and len(fp) > 50 and fp in seen_fingerprints:
                 return True
