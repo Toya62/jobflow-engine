@@ -588,8 +588,13 @@ def run_gemini_matcher_on_db(
     results_lock = threading.Lock()
     processed_count = 0
 
+    abort_event = threading.Event()
+
     def _process_job(row_item):
         nonlocal processed_count, gemini_count, fallback_count, prefilter_count, failed_count
+        if abort_event.is_set():
+            return None
+
         idx_local, row_data = row_item
         row_dict = row_data.to_dict()
         row_dict["job_id"] = row_data["id"]
@@ -605,6 +610,9 @@ def run_gemini_matcher_on_db(
             title = str(row_dict.get('title', 'Unknown'))[:40]
             company = str(row_dict.get('company', 'Unknown'))[:25]
             print(f"[{curr_idx}/{total_jobs}] ⚠️ {company} - {title}: FAILED_AI_EVALUATION")
+            router_status = get_router_status()
+            if router_status.get("all_disabled"):
+                abort_event.set()
             return None
 
         prov = res.get("_ai_provider", "gemini")
@@ -662,7 +670,16 @@ def run_gemini_matcher_on_db(
     max_workers = min(concurrency, max(1, len(items)))
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(_process_job, item) for item in items]
+        futures = []
+        for item in items:
+            if abort_event.is_set():
+                break
+            futures.append(executor.submit(_process_job, item))
+            # Wait for first evaluation to complete so router failure check triggers before queueing rest
+            if len(futures) == 1:
+                futures[0].result()
+                if abort_event.is_set():
+                    break
         for f in as_completed(futures):
             # check router circuit breaker
             router_status = get_router_status()
