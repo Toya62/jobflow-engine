@@ -86,3 +86,21 @@ def test_cross_portal_dedup_requisition_and_location():
     assert "Bundesanstalt" in res.iloc[0]["company"] or "BAV" in res.iloc[0]["company"]
 
 
+def test_core_target_titles_not_killed_by_incidental_keywords():
+    from src.core.filters import filter_forbidden_tech
+
+    df = pd.DataFrame([
+        {"title": "Webentwickler Python", "description": "Tech stack Java, PHP, C#, Swift vorzugsweise Python und PostgreSQL"},
+        {"title": "Junior Backend Developer (Python)", "description": "Backend API mit Python FastAPI. Bei Kenntnissen in React wirkst du aktiv mit."},
+        {"title": "Python Backend Developer KI-Plattform", "description": "Bauen Python Microservices für bestehende React-Oberfläche"},
+        {"title": "DevOps Engineer for Testing", "description": "Testing infrastructure for Defence, maritime, aerospace, automotive clients with Docker and Kubernetes"},
+        {"title": "Cloud & Backend Engineer", "description": "Working with clinical data and AI to help healthcare clients in AWS and Python"},
+        {"title": "Solution Engineer DevSecOps", "description": "Cloud security with Linux, Terraform, Kenntnisse im Bereich Entra ID und Active Directory"},
+        {"title": "Junior Cloud Developer Kubernetes & Golang", "description": "Cloud developer with Kubernetes and Golang microservices"}
+    ])
+
+    res = filter_forbidden_tech(df)
+    assert len(res) == 7, f"Expected all 7 on-profile roles to survive, got {len(res)}"
+
+
+

@@ -652,6 +652,17 @@ OPTIONAL_PHRASE_PAT = re.compile(
 )
 
 
+TITLE_EXPLICIT_VERIFIED_PAT = re.compile(
+    r"\b(python|c\+\+|c/c\+\+|devops|devsecops|data|cloud|sre|mlops|linux|kafka|flink|streaming|etl|k8s|kubernetes|aws|docker)\b",
+    re.IGNORECASE
+)
+
+CITIZENSHIP_HARD_PAT = re.compile(
+    r"\b(european citizenship|eu citizenship|eu-bürgerschaft|eu-staatsbürgerschaft|französisch erforderlich|spanisch erforderlich|french mandatory|spanish mandatory)\b",
+    re.IGNORECASE
+)
+
+
 def filter_forbidden_tech(df: pd.DataFrame) -> pd.DataFrame:
     title_col = df.get("title", pd.Series("", index=df.index)).fillna("")
     desc_col  = df.get("description", pd.Series("", index=df.index)).fillna("")
@@ -660,20 +671,35 @@ def filter_forbidden_tech(df: pd.DataFrame) -> pd.DataFrame:
         d = str(desc)
         text = t + " " + d
 
-        # Priority 1: Protected Core Target & CS Titles
-        # A clean title like "Software Engineer" must NOT let a description
-        # full of C# / .NET / SAP ABAP through — the title alone is not
-        # evidence the role is on-profile.
-        if CORE_TARGET_TITLE_PAT.search(t) or CS_CORE_TITLE_PAT.search(t):
-            if HARD_FORBIDDEN_TECH_PAT.search(text):
-                return True
+        # 1. Strict citizenship / language legal barriers
+        if CITIZENSHIP_HARD_PAT.search(text):
+            return True
+
+        # 2. Hard forbidden tech in the TITLE itself is always disqualified
+        if HARD_FORBIDDEN_TECH_PAT.search(t):
+            return True
+
+        # 3. Explicitly targeted on-profile titles (Python, DevOps, Data Engineer, Cloud, C++, MLOps, SRE)
+        # Never kill an explicit target role due to incidental keywords in description
+        if TITLE_EXPLICIT_VERIFIED_PAT.search(t):
             return False
 
-        # Priority 2: Non-core titles
+        # 4. Core CS / Software titles (e.g. Software Engineer, Developer, Informatiker)
+        if CORE_TARGET_TITLE_PAT.search(t) or CS_CORE_TITLE_PAT.search(t):
+            # If description mentions forbidden tech, only reject if there is NO verified core stack
+            if HARD_FORBIDDEN_TECH_PAT.search(d):
+                if not VERIFIED_STACK_PAT.search(d):
+                    return True
+            return False
+
+        # 5. Non-core titles
         if HARD_FORBIDDEN_TECH_PAT.search(text):
             return True
 
-        if WINDOWS_SYSADMIN_PAT.search(t) or (WINDOWS_SYSADMIN_PAT.search(d) and not re.search(r'\b(linux|docker|kubernetes|python|c\+\+|terraform|cloud|azure|aws|gcp)\b', text, re.IGNORECASE)):
+        if WINDOWS_SYSADMIN_PAT.search(t) or (
+            WINDOWS_SYSADMIN_PAT.search(d)
+            and not re.search(r'\b(linux|docker|kubernetes|python|c\+\+|terraform|cloud|azure|aws|gcp)\b', text, re.IGNORECASE)
+        ):
             return True
 
         if ADMIN_INFRA_PAT.search(text):

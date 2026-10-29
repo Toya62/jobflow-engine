@@ -56,6 +56,8 @@ cs_relevance_keywords:
   - machine learning
   - data science
   - data engineer
+  - data engineering
+  - data platform
   - data pipeline
   - python
   - java
@@ -423,6 +425,8 @@ forbidden_tech_hard:
 # Customize to match YOUR target roles.
 core_target_title_keywords:
   - data engineer
+  - data engineering
+  - data platform
   - cloud engineer
   - devops
   - backend
