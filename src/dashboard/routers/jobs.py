@@ -212,6 +212,21 @@ def list_jobs(
               AND e.score >= 85
               AND e.status != 'USER_DISMISSED'
               AND (a.id IS NULL OR a.cv_pdf_path IS NULL OR a.cv_pdf_path = '')
+              AND NOT EXISTS (
+                  SELECT 1 FROM applications a2
+                  JOIN jobs j2 ON a2.job_id = j2.id
+                  WHERE a2.cv_pdf_path IS NOT NULL AND a2.cv_pdf_path != ''
+                    AND (
+                        LOWER(j.url) = LOWER(j2.url)
+                        OR (
+                            LOWER(SUBSTR(j.title, 1, 20)) = LOWER(SUBSTR(j2.title, 1, 20))
+                            AND (
+                                LOWER(j.company) LIKE '%' || LOWER(SUBSTR(j2.company, 1, 5)) || '%'
+                                OR LOWER(j2.company) LIKE '%' || LOWER(SUBSTR(j.company, 1, 5)) || '%'
+                            )
+                        )
+                    )
+              )
             ORDER BY e.score DESC, j.id DESC
             '''
         elif 'all_combined' in raw_dataset:
