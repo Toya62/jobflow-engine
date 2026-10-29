@@ -389,6 +389,21 @@ def handle_scrape(args):
     except Exception as e:
         print(f"Warning: could not save latest_run_summary.json: {e}")
 
+    # ── Auto-generate application packages (CV + Cover Letter) for 85%+ jobs ──
+    auto_generate = not getattr(args, "no_generate", False)
+    if auto_generate:
+        try:
+            from src.generators.auto_generate import auto_generate_approved_applications
+            days_window = getattr(args, "days", 1) or 1
+            gen_res = auto_generate_approved_applications(
+                min_score=85,
+                max_age_days=days_window,
+                notify_telegram=True,
+            )
+            print(f"✓ Auto-generation complete: {gen_res['generated_count']} generated, {gen_res['remaining_count']} left.")
+        except Exception as gen_err:
+            print(f"[Warning] Auto-generation error: {gen_err}", file=sys.stderr)
+
 
 def handle_match(args):
     """Run AI evaluation directly on SQLite or any CSV."""
@@ -418,6 +433,34 @@ def handle_match(args):
             portal=getattr(args, "portal", None),
             max_age_days=effective_age,
         )
+
+        auto_generate = not getattr(args, "no_generate", False)
+        if auto_generate:
+            try:
+                from src.generators.auto_generate import auto_generate_approved_applications
+                gen_res = auto_generate_approved_applications(
+                    min_score=85,
+                    max_age_days=effective_age or 1,
+                    notify_telegram=True,
+                )
+                print(f"✓ Auto-generation complete: {gen_res['generated_count']} generated, {gen_res['remaining_count']} left.")
+            except Exception as gen_err:
+                print(f"[Warning] Auto-generation error: {gen_err}", file=sys.stderr)
+
+
+def handle_generate_approved(args):
+    """Auto-generate tailored ATS packages for approved jobs scoring >= min-score."""
+    print(f"\n{'='*60}")
+    print(f"  Karriere Pipeline — Auto-Generate Approved Applications")
+    print(f"{'='*60}\n")
+    from src.generators.auto_generate import auto_generate_approved_applications
+    res = auto_generate_approved_applications(
+        min_score=args.min_score,
+        max_age_days=args.days,
+        limit=args.limit,
+        notify_telegram=not args.no_notify,
+    )
+    print(f"\n✓ Done: {res['generated_count']} generated, {res['remaining_count']} left in queue.")
 
 
 def handle_dashboard(args):
@@ -503,6 +546,11 @@ def main():
         action="store_true",
         help="Skip automatic AI evaluation after scraping"
     )
+    scrape_parser.add_argument(
+        "--no-generate",
+        action="store_true",
+        help="Skip automatic CV/Cover letter generation for 85%+ jobs"
+    )
 
     # AUTO parser (Alias)
     auto_parser = subparsers.add_parser("auto", help="Alias for scrape --portal all with automatic AI matching")
@@ -517,6 +565,11 @@ def main():
         type=int,
         default=1,
         help="Number of days to scrape back (default: 1)"
+    )
+    auto_parser.add_argument(
+        "--no-generate",
+        action="store_true",
+        help="Skip automatic CV/Cover letter generation for 85%+ jobs"
     )
 
     # Match parser (standalone AI evaluation on SQLite or optional CSV)
@@ -560,6 +613,18 @@ def main():
         default=2,
         help="Only evaluate jobs scraped within the last N days (default: 2; pass 0 for all historical jobs)"
     )
+    match_parser.add_argument(
+        "--no-generate",
+        action="store_true",
+        help="Skip automatic CV/Cover letter generation for 85%+ jobs"
+    )
+
+    # Generate-approved parser
+    gen_app_parser = subparsers.add_parser("generate-approved", help="Auto-generate CV and Cover Letter for approved jobs (>= 85%%)")
+    gen_app_parser.add_argument("--min-score", type=int, default=85, help="Minimum score cutoff (default: 85)")
+    gen_app_parser.add_argument("--days", type=int, default=1, help="Max age in days (default: 1)")
+    gen_app_parser.add_argument("--limit", type=int, default=25, help="Max packages to generate (default: 25)")
+    gen_app_parser.add_argument("--no-notify", action="store_true", help="Suppress Telegram alert")
 
 # Dashboard parser
     dashboard_parser = subparsers.add_parser("dashboard", help="Launch the local job matching dashboard")
@@ -592,6 +657,8 @@ def main():
         handle_scrape(args)
     elif args.command == "match":
         handle_match(args)
+    elif args.command == "generate-approved":
+        handle_generate_approved(args)
     elif args.command == "dashboard":
         handle_dashboard(args)
     elif args.command == "pull":
