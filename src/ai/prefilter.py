@@ -16,8 +16,10 @@ TITLE_RULES: list[tuple[str, list[str], str]] = [
     (
         "REJECTED_EMPLOYMENT_TYPE",
         [r"werkstudent(?:in)?(?:en)?", r"working\s+student", r"praktikum", r"praktikant(?:in)?(?:nen)?",
-         r"intern(?:ship)?s?", r"mini-?job(?:ber)?", r"geringfügig\w*"],
-        "Title indicates a non-full-time/student/internship role.",
+         r"intern(?:ship)?s?", r"mini-?job(?:ber)?", r"geringfügig\w*",
+         r"master(?:\s*['’]?s)?\s*thesis", r"masterarbeit", r"bachelor(?:\s*['’]?s)?\s*thesis", r"bachelorarbeit",
+         r"abschlussarbeit", r"diplomarbeit"],
+        "Title indicates a non-full-time/student/internship/thesis role.",
     ),
     (
         "REJECTED_SENIORITY_EXP",

@@ -70,6 +70,7 @@ Use the supplied profile as the only source of candidate facts. Do not assume qu
    - REJECT as "REJECTED_EMPLOYMENT_TYPE" if the position is exclusively:
      * "Werkstudent" / "Working Student"
      * "Praktikum" / "Internship"
+     * "Masterarbeit" / "Master's Thesis" / "Bachelorarbeit" / "Bachelor's Thesis" / "Abschlussarbeit"
      * "Teilzeit" / "Part-time" or "Minijob" / "geringfügige Beschäftigung" (unless explicitly offering full-time conversion or full-time as an option).
 
 5. ROLE SCOPE & ENGINEERING FOCUS GATE:
