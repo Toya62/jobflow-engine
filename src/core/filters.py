@@ -858,6 +858,43 @@ def filter_empty_description(df: pd.DataFrame, min_chars: int = 150) -> pd.DataF
     return df[mask].copy()
 
 
+# ── Strictly Blocked Non-German Locations ──────────────────────────────────
+# Rejects jobs localized outside Germany when returned by portals like XING / Indeed / LinkedIn
+BLOCKED_LOCATIONS_PAT = re.compile(
+    r"\b("
+    r"österreich|austria|wien|vienna|salzburg|graz|innsbruck|linz|"
+    r"schweiz|switzerland|zürich|zurich|bern|basel|geneva|genf|lausanne|"
+    r"netherlands|niederlande|amsterdam|rotterdam|utrecht|eindhoven|"
+    r"united\s+states|usa|canada|united\s+kingdom|london|ireland|dublin|"
+    r"poland|warsaw|france|paris|spain|madrid|barcelona|italy|milan|rome|"
+    r"india|singapore|australia|sydney|japan|tokyo"
+    r")\b",
+    re.IGNORECASE,
+)
+
+def filter_location(df: pd.DataFrame) -> pd.DataFrame:
+    """Hard filter: reject jobs with explicit locations outside Germany (e.g. Austria, Switzerland, Netherlands)."""
+    if "location" not in df.columns or df.empty:
+        return df.copy()
+
+    loc_col = df["location"].fillna("").astype(str)
+    def _is_valid_location(loc: str) -> bool:
+        loc_str = loc.strip()
+        if not loc_str:
+            return True  # If unspecified, keep
+        # Drop if an explicitly blocked country/city is present without 'germany' / 'deutschland'
+        if BLOCKED_LOCATIONS_PAT.search(loc_str):
+            if re.search(r"\b(germany|deutschland|de)\b", loc_str, re.IGNORECASE):
+                return True
+            return False
+        return True
+
+    mask = loc_col.apply(_is_valid_location)
+    logger.info(f"  Location filter:    {mask.sum():4d} / {len(df)} kept  ({(~mask).sum()} removed outside Germany)")
+    _log_removed(df, mask, "Location filter")
+    return df[mask].copy()
+
+
 def apply_filters(df: pd.DataFrame, max_days: int | None = None, is_linkedin: bool = False) -> pd.DataFrame:
     if df.empty:
         return df
@@ -865,6 +902,7 @@ def apply_filters(df: pd.DataFrame, max_days: int | None = None, is_linkedin: bo
         df = filter_reposted(df)
     df = filter_date(df, max_days=max_days, is_linkedin=is_linkedin)
     df = filter_empty_description(df)   # ← Drop link-only / empty-desc jobs before any evaluation
+    df = filter_location(df)            # ← Hard reject listings outside Germany
     df = filter_seniority(df)
     df = filter_experience(df)
     df = filter_noise(df)

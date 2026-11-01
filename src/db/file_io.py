@@ -7,7 +7,15 @@ import csv
 from datetime import datetime, timezone
 import pandas as pd
 
-from src.core.utils import _plain_url, _norm, _extract_req_id, _extract_title_tokens, _extract_location_key
+from src.core.utils import (
+    _plain_url,
+    _norm,
+    _extract_req_id,
+    _extract_title_tokens,
+    _extract_location_key,
+    normalize_company_entity,
+    normalize_title_entity,
+)
 from src.core.logger import get_logger
 logger = get_logger(__name__)
 
@@ -44,7 +52,20 @@ def dedup(df: pd.DataFrame) -> pd.DataFrame:
             req_df = req_df.drop_duplicates(subset=["_req_id"], keep="first").drop(columns=["_req_id"])
             df = pd.concat([req_df, df[~has_req]], ignore_index=True)
 
-    # 2. Title + Company deduplication
+    # 2. Canonical Company Entity + Title deduplication (cross-portal suffix matching)
+    df["_entity_key"] = (
+        df.get("title", pd.Series("", index=df.index)).fillna("").apply(normalize_title_entity)
+        + "|||"
+        + df.get("company", pd.Series("", index=df.index)).fillna("").apply(normalize_company_entity)
+    )
+    # Only drop when both company and title resolved to non-empty entities
+    valid_keys = df["_entity_key"].str.strip() != "|||"
+    if valid_keys.any():
+        df_valid = df[valid_keys].drop_duplicates(subset=["_entity_key"], keep="first")
+        df = pd.concat([df_valid, df[~valid_keys]], ignore_index=True)
+    df = df.drop(columns=["_entity_key"], errors="ignore")
+
+    # Fallback to standard exact Title + Company
     df["_key"] = (
         df.get("title",   pd.Series("", index=df.index)).fillna("").apply(_norm)
         + "|||"

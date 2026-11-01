@@ -95,6 +95,18 @@ def _sanitize_tex_file(tex_path: str) -> None:
         content = content.replace(r'\item \\textbf', r'\item \textbf')
         content = re.sub(r'\\+\s*\\\\', r'\\\\', content)
         content = re.sub(r'(\\href\{[^}]+\}\{[^}]+)\}\}', r'\1}', content)
+
+        # Fix AI hallucinations: undefined commands or broken environment closures
+        content = content.replace(r'\centerend', r'\end{center}')
+        content = content.replace(r'\Python', 'Python')
+        content = content.replace(r'\FastAPI', 'FastAPI')
+        content = content.replace(r'\Docker', 'Docker')
+        content = content.replace(r'\\^%', r'\\%')
+        content = re.sub(r'\\{1,2}\^%', r'\\\\%', content)
+
+        # Ensure document environment has \end{document}
+        if r'\begin{document}' in content and r'\end{document}' not in content:
+            content = content.strip() + '\n\\end{document}\n'
         # 9. Fix lines ending with a single backslash (should be \\ in LaTeX)
         sanitized_lines = []
         for line in content.splitlines():

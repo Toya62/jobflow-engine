@@ -61,6 +61,56 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", str(s).lower().strip())
 
 
+def normalize_company_entity(s: str) -> str:
+    """Canonical company normalization for cross-portal and historical deduplication.
+
+    Strips legal suffixes, branch designations (e.g. 'Hauptsitz Berlin', 'Destatis'),
+    subsidiary/agency tags, and punctuation so that:
+      'aconium GmbH' == 'aconium GmbH (Hauptsitz Berlin)'
+      'Statistisches Bundesamt (Destatis)' == 'Statistisches Bundesamt'
+      'Advantest Europe GmbH' == 'Advantest'
+    """
+    if not s or not isinstance(s, str):
+        return ""
+    text = s.lower().strip()
+    # Strip parenthetical annotations: (Destatis), (Hauptsitz ...), (Europe), etc.
+    text = re.sub(r"\(.*?\)", "", text)
+    # Strip common legal and branch designations
+    text = re.sub(
+        r"\b(gmbh|ag|co|kg|kgaa|se|inc|corp|ltd|s\.a\.|ug|haftungsbeschr\u00e4nkt|holding|group|gruppe|"
+        r"europe|deutschland|germany|hauptsitz|niederlassung|city|land\s+bw|land\s+bayern)\b",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Replace non-alphanumeric with spaces and clean up
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split()).strip()
+
+
+def normalize_title_entity(s: str) -> str:
+    """Canonical title normalization for deduplication across portals.
+
+    Strips gender markers (m/w/d, all genders, etc.), trailing punctuation,
+    and brackets.
+    """
+    if not s or not isinstance(s, str):
+        return ""
+    text = s.lower().strip()
+    # Strip gender annotations: (m/w/d), (f/m/d), (all genders), (gn), [m/w/d], etc.
+    text = re.sub(
+        r"[\(\[\/]\s*(?:m[\/\-]?[wf]d?|f[\/\-]?[md]|w[\/\-]?[mf]d?|d[\/\-]?[wm]|all\s+genders?|gn|m\/f\/d|m\/w\/d|d\/m\/w|x)\s*[\)\]\/]?",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\b(all\s+genders?|gn|m\/w\/d|f\/m\/d|m\/f\/d|w\/m\/d|d\/w\/m)\b", "", text, flags=re.IGNORECASE)
+    # Strip trailing dashes or slashes
+    text = re.sub(r"[-–—\/]+$", "", text).strip()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split()).strip()
+
+
 def _normalize_company(s: str) -> str:
     s = str(s).lower().strip()
     s = re.sub(r"\b(gmbh|ag|co|kg|se|inc|corp|ltd|s\.a\.|university|universität|uni|hochschule)\b", "", s)
