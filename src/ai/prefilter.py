@@ -26,6 +26,13 @@ TITLE_RULES: list[tuple[str, list[str], str]] = [
         [r"senior", r"lead", r"principal", r"head\s+of", r"architect", r"leiter(?:in)?"],
         "Title indicates a senior/lead/management-level role.",
     ),
+    (
+        "REJECTED_OUT_OF_PROFILE_DOMAIN",
+        [r"consultant", r"inhouse\s+consultant", r"marketing\s+automation", r"sales\b", r"recruiter\b",
+         r"account\s+manager", r"business\s+analyst", r"controller\b", r"buchhalter\b",
+         r"java\s+cloud\s+developer", r"pure\s+java", r"\bdotnet\b", r"c#\s+developer"],
+        "Title indicates non-engineering, consulting, marketing, or disjoint enterprise stack.",
+    ),
 ]
 
 _FULL_TIME_HINT = re.compile(r"\b(vollzeit|full[\s-]?time)\b", re.I)
